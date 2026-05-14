@@ -25,8 +25,8 @@ const partSchema = z.object({
   reference: z.string().trim().min(1, "La référence est obligatoire"),
   name: z.string().trim().min(1, "La désignation est obligatoire"),
   description: optionalText.optional(),
-  brandId: optionalText.optional(),
-  categoryId: optionalText.optional(),
+  brandId: z.string().trim().min(1, "La marque est obligatoire"),
+  categoryId: z.string().trim().min(1, "La catégorie est obligatoire"),
   supplierId: optionalText.optional(),
   vatRate: z
     .string()
@@ -113,8 +113,8 @@ export async function updatePart(formData: FormData) {
       reference: data.reference,
       name: data.name,
       description: data.description,
-      brandId: data.brandId ?? null,
-      categoryId: data.categoryId ?? null,
+      brandId: data.brandId,
+      categoryId: data.categoryId,
       supplierId: data.supplierId ?? null,
       vatRate: data.vatRate / 100,
       reorderThreshold: data.reorderThreshold ?? 0,

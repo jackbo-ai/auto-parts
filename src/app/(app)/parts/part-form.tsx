@@ -104,13 +104,14 @@ export function PartForm({
               placeholder="Jeu de plaquettes de frein avant"
             />
           </Field>
-          <Field label="Marque" htmlFor="brandId">
+          <Field label="Marque" htmlFor="brandId" required>
             <Select
               id="brandId"
               name="brandId"
+              required
               defaultValue={part?.brandId ?? ""}
             >
-              <option value="">— Aucune —</option>
+              <option value="">— Choisir —</option>
               {brands.map((b) => (
                 <option key={b.id} value={b.id}>
                   {b.name}
@@ -118,13 +119,14 @@ export function PartForm({
               ))}
             </Select>
           </Field>
-          <Field label="Catégorie" htmlFor="categoryId">
+          <Field label="Catégorie" htmlFor="categoryId" required>
             <Select
               id="categoryId"
               name="categoryId"
+              required
               defaultValue={part?.categoryId ?? ""}
             >
-              <option value="">— Aucune —</option>
+              <option value="">— Choisir —</option>
               {categories.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
