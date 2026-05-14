@@ -9,8 +9,13 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { createSalesOrder } from "../actions";
 
-export default async function NewSalesOrderPage() {
+export default async function NewSalesOrderPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>;
+}) {
   await requireRole([Role.ADMIN, Role.MANAGER]);
+  const { error } = await searchParams;
 
   const customers = await prisma.customer.findMany({
     orderBy: { name: "asc" },
@@ -26,6 +31,12 @@ export default async function NewSalesOrderPage() {
         Retour aux commandes client
       </Link>
       <h1 className="text-2xl font-semibold">Nouvelle commande client</h1>
+
+      {error && (
+        <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          {error}
+        </p>
+      )}
 
       {customers.length === 0 ? (
         <div className="rounded-lg border bg-card px-4 py-8 text-center text-sm text-muted-foreground">

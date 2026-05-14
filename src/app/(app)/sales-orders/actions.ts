@@ -16,6 +16,13 @@ import { weightedAveragePrice } from "@/lib/pmp";
 
 const MANAGE_ROLES = [Role.ADMIN, Role.MANAGER];
 
+// Renvoie l'utilisateur vers une page en y affichant un message d'erreur,
+// plutôt que de laisser un throw remonter en écran de crash. `redirect`
+// interrompt l'exécution (il lève en interne), d'où le type `never`.
+function failTo(path: string, message: string): never {
+  redirect(`${path}?error=${encodeURIComponent(message)}`);
+}
+
 const optionalText = z
   .string()
   .transform((v) => v.trim())
@@ -31,7 +38,10 @@ export async function createSalesOrder(formData: FormData) {
   const user = await requireRole(MANAGE_ROLES);
   const parsed = createSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) {
-    throw new Error(parsed.error.issues[0]?.message ?? "Formulaire invalide");
+    failTo(
+      "/sales-orders/new",
+      parsed.error.issues[0]?.message ?? "Formulaire invalide",
+    );
   }
 
   const order = await prisma.$transaction(async (tx) => {
@@ -74,19 +84,24 @@ const lineSchema = z.object({
 
 export async function addSalesLine(formData: FormData) {
   await requireRole(MANAGE_ROLES);
+  const salesOrderId = String(formData.get("salesOrderId") ?? "");
+  const backPath = salesOrderId
+    ? `/sales-orders/${salesOrderId}`
+    : "/sales-orders";
+
   const parsed = lineSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) {
-    throw new Error(parsed.error.issues[0]?.message ?? "Formulaire invalide");
+    failTo(backPath, parsed.error.issues[0]?.message ?? "Formulaire invalide");
   }
-  const { salesOrderId, partId, quantity, unitPriceHt, vatRate } = parsed.data;
+  const { partId, quantity, unitPriceHt, vatRate } = parsed.data;
 
   const order = await prisma.salesOrder.findUnique({
     where: { id: salesOrderId },
     select: { status: true },
   });
-  if (!order) throw new Error("Commande introuvable.");
+  if (!order) failTo(backPath, "Commande introuvable.");
   if (order.status !== SalesOrderStatus.DRAFT) {
-    throw new Error("Les lignes ne sont modifiables qu'en brouillon.");
+    failTo(backPath, "Les lignes ne sont modifiables qu'en brouillon.");
   }
 
   await prisma.salesOrderLine.create({
@@ -105,15 +120,18 @@ export async function removeSalesLine(formData: FormData) {
   await requireRole(MANAGE_ROLES);
   const id = String(formData.get("id") ?? "");
   const salesOrderId = String(formData.get("salesOrderId") ?? "");
-  if (!id) throw new Error("Ligne introuvable.");
+  const backPath = salesOrderId
+    ? `/sales-orders/${salesOrderId}`
+    : "/sales-orders";
+  if (!id) failTo(backPath, "Ligne introuvable.");
 
   const line = await prisma.salesOrderLine.findUnique({
     where: { id },
     select: { salesOrder: { select: { status: true } } },
   });
-  if (!line) throw new Error("Ligne introuvable.");
+  if (!line) failTo(backPath, "Ligne introuvable.");
   if (line.salesOrder.status !== SalesOrderStatus.DRAFT) {
-    throw new Error("Les lignes ne sont modifiables qu'en brouillon.");
+    failTo(backPath, "Les lignes ne sont modifiables qu'en brouillon.");
   }
 
   await prisma.salesOrderLine.delete({ where: { id } });
@@ -123,18 +141,19 @@ export async function removeSalesLine(formData: FormData) {
 export async function markSalesConfirmed(formData: FormData) {
   await requireRole(MANAGE_ROLES);
   const id = String(formData.get("id") ?? "");
-  if (!id) throw new Error("Commande introuvable.");
+  if (!id) failTo("/sales-orders", "Commande introuvable.");
+  const backPath = `/sales-orders/${id}`;
 
   const order = await prisma.salesOrder.findUnique({
     where: { id },
     select: { status: true, _count: { select: { lines: true } } },
   });
-  if (!order) throw new Error("Commande introuvable.");
+  if (!order) failTo(backPath, "Commande introuvable.");
   if (order.status !== SalesOrderStatus.DRAFT) {
-    throw new Error("Seul un brouillon peut être confirmé.");
+    failTo(backPath, "Seul un brouillon peut être confirmé.");
   }
   if (order._count.lines === 0) {
-    throw new Error("Ajoutez au moins une ligne avant de confirmer.");
+    failTo(backPath, "Ajoutez au moins une ligne avant de confirmer.");
   }
 
   await prisma.salesOrder.update({
@@ -147,86 +166,95 @@ export async function markSalesConfirmed(formData: FormData) {
 
 // Livraison : passe la commande en DELIVERED, crée un mouvement de sortie par
 // ligne et fige le coût d'achat unitaire (pour le calcul de marge), le tout
-// dans la même transaction. Échoue si le stock est insuffisant.
+// dans la même transaction. Si le stock est insuffisant, la transaction est
+// annulée et l'utilisateur est renvoyé vers la commande avec le message.
 export async function deliverSalesOrder(formData: FormData) {
   const user = await requireRole(MANAGE_ROLES);
   const id = String(formData.get("id") ?? "");
-  if (!id) throw new Error("Commande introuvable.");
+  if (!id) failTo("/sales-orders", "Commande introuvable.");
+  const backPath = `/sales-orders/${id}`;
 
-  await prisma.$transaction(async (tx) => {
-    const order = await tx.salesOrder.findUnique({
-      where: { id },
-      include: { lines: true },
-    });
-    if (!order) throw new Error("Commande introuvable.");
-    if (order.status !== SalesOrderStatus.CONFIRMED) {
-      throw new Error("Seule une commande confirmée peut être livrée.");
-    }
-
-    for (const line of order.lines) {
-      const part = await tx.part.findUnique({
-        where: { id: line.partId },
-        select: { reference: true, stockQty: true, purchasePriceHt: true },
+  try {
+    await prisma.$transaction(async (tx) => {
+      const order = await tx.salesOrder.findUnique({
+        where: { id },
+        include: { lines: true },
       });
-      if (!part) throw new Error("Pièce introuvable sur une ligne.");
-
-      const resulting = part.stockQty - line.quantity;
-      if (resulting < 0) {
-        throw new Error(
-          `Stock insuffisant pour ${part.reference} : ${part.stockQty} en stock, ${line.quantity} demandé(s).`,
-        );
+      if (!order) throw new Error("Commande introuvable.");
+      if (order.status !== SalesOrderStatus.CONFIRMED) {
+        throw new Error("Seule une commande confirmée peut être livrée.");
       }
 
-      await tx.stockMovement.create({
+      for (const line of order.lines) {
+        const part = await tx.part.findUnique({
+          where: { id: line.partId },
+          select: { reference: true, stockQty: true, purchasePriceHt: true },
+        });
+        if (!part) throw new Error("Pièce introuvable sur une ligne.");
+
+        const resulting = part.stockQty - line.quantity;
+        if (resulting < 0) {
+          throw new Error(
+            `Stock insuffisant pour ${part.reference} : ${part.stockQty} en stock, ${line.quantity} demandé(s).`,
+          );
+        }
+
+        await tx.stockMovement.create({
+          data: {
+            partId: line.partId,
+            type: StockMovementType.OUT,
+            quantity: -line.quantity,
+            resulting,
+            reason: `Livraison vente ${order.reference}`,
+            createdById: user.id,
+          },
+        });
+        await tx.part.update({
+          where: { id: line.partId },
+          data: { stockQty: resulting },
+        });
+
+        // Fige le coût d'achat unitaire au moment de la livraison : on prend le
+        // PMP à date, calculé depuis l'historique des achats réceptionnés. À
+        // défaut d'historique, repli sur le prix d'achat de référence.
+        const costLines = await tx.purchaseOrderLine.findMany({
+          where: {
+            partId: line.partId,
+            purchaseOrder: { status: PurchaseOrderStatus.RECEIVED },
+          },
+          select: {
+            quantity: true,
+            unitPriceHt: true,
+            purchaseOrder: { select: { orderDate: true } },
+          },
+        });
+        const pmp = weightedAveragePrice(
+          costLines.map((c) => ({
+            quantity: c.quantity,
+            unitPriceHt: c.unitPriceHt,
+            date: c.purchaseOrder.orderDate,
+          })),
+        );
+        await tx.salesOrderLine.update({
+          where: { id: line.id },
+          data: { unitCostHt: pmp ?? part.purchasePriceHt },
+        });
+      }
+
+      await tx.salesOrder.update({
+        where: { id },
         data: {
-          partId: line.partId,
-          type: StockMovementType.OUT,
-          quantity: -line.quantity,
-          resulting,
-          reason: `Livraison vente ${order.reference}`,
-          createdById: user.id,
+          status: SalesOrderStatus.DELIVERED,
+          deliveredAt: new Date(),
         },
       });
-      await tx.part.update({
-        where: { id: line.partId },
-        data: { stockQty: resulting },
-      });
-
-      // Fige le coût d'achat unitaire au moment de la livraison : on prend le
-      // PMP à date, calculé depuis l'historique des achats réceptionnés. À
-      // défaut d'historique, repli sur le prix d'achat de référence.
-      const costLines = await tx.purchaseOrderLine.findMany({
-        where: {
-          partId: line.partId,
-          purchaseOrder: { status: PurchaseOrderStatus.RECEIVED },
-        },
-        select: {
-          quantity: true,
-          unitPriceHt: true,
-          purchaseOrder: { select: { orderDate: true } },
-        },
-      });
-      const pmp = weightedAveragePrice(
-        costLines.map((c) => ({
-          quantity: c.quantity,
-          unitPriceHt: c.unitPriceHt,
-          date: c.purchaseOrder.orderDate,
-        })),
-      );
-      await tx.salesOrderLine.update({
-        where: { id: line.id },
-        data: { unitCostHt: pmp ?? part.purchasePriceHt },
-      });
-    }
-
-    await tx.salesOrder.update({
-      where: { id },
-      data: {
-        status: SalesOrderStatus.DELIVERED,
-        deliveredAt: new Date(),
-      },
     });
-  });
+  } catch (error) {
+    failTo(
+      backPath,
+      error instanceof Error ? error.message : "Échec de la livraison.",
+    );
+  }
 
   revalidatePath("/sales-orders");
   revalidatePath(`/sales-orders/${id}`);
@@ -237,15 +265,16 @@ export async function deliverSalesOrder(formData: FormData) {
 export async function invoiceSalesOrder(formData: FormData) {
   await requireRole(MANAGE_ROLES);
   const id = String(formData.get("id") ?? "");
-  if (!id) throw new Error("Commande introuvable.");
+  if (!id) failTo("/sales-orders", "Commande introuvable.");
+  const backPath = `/sales-orders/${id}`;
 
   const order = await prisma.salesOrder.findUnique({
     where: { id },
     select: { status: true },
   });
-  if (!order) throw new Error("Commande introuvable.");
+  if (!order) failTo(backPath, "Commande introuvable.");
   if (order.status !== SalesOrderStatus.DELIVERED) {
-    throw new Error("Seule une commande livrée peut être facturée.");
+    failTo(backPath, "Seule une commande livrée peut être facturée.");
   }
 
   await prisma.salesOrder.update({
@@ -260,18 +289,19 @@ export async function invoiceSalesOrder(formData: FormData) {
 export async function cancelSalesOrder(formData: FormData) {
   await requireRole(MANAGE_ROLES);
   const id = String(formData.get("id") ?? "");
-  if (!id) throw new Error("Commande introuvable.");
+  if (!id) failTo("/sales-orders", "Commande introuvable.");
+  const backPath = `/sales-orders/${id}`;
 
   const order = await prisma.salesOrder.findUnique({
     where: { id },
     select: { status: true },
   });
-  if (!order) throw new Error("Commande introuvable.");
+  if (!order) failTo(backPath, "Commande introuvable.");
   if (
     order.status !== SalesOrderStatus.DRAFT &&
     order.status !== SalesOrderStatus.CONFIRMED
   ) {
-    throw new Error("Cette commande ne peut plus être annulée.");
+    failTo(backPath, "Cette commande ne peut plus être annulée.");
   }
 
   await prisma.salesOrder.update({
@@ -285,18 +315,20 @@ export async function cancelSalesOrder(formData: FormData) {
 export async function deleteSalesOrder(formData: FormData) {
   await requireRole(MANAGE_ROLES);
   const id = String(formData.get("id") ?? "");
-  if (!id) throw new Error("Commande introuvable.");
+  if (!id) failTo("/sales-orders", "Commande introuvable.");
+  const backPath = `/sales-orders/${id}`;
 
   const order = await prisma.salesOrder.findUnique({
     where: { id },
     select: { status: true },
   });
-  if (!order) throw new Error("Commande introuvable.");
+  if (!order) failTo(backPath, "Commande introuvable.");
   if (
     order.status === SalesOrderStatus.DELIVERED ||
     order.status === SalesOrderStatus.INVOICED
   ) {
-    throw new Error(
+    failTo(
+      backPath,
       "Une commande livrée ou facturée ne peut pas être supprimée (le stock a déjà été mouvementé).",
     );
   }
