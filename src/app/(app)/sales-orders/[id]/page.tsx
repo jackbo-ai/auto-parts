@@ -10,6 +10,7 @@ import { ConfirmSubmit } from "@/components/confirm-submit";
 import { formatDate, formatEuro } from "@/lib/utils";
 import { lineTotals, orderTotals } from "@/lib/totals";
 import { SALES_STATUS_BADGE, SALES_STATUS_LABELS } from "@/lib/orders";
+import { partsSalePmpMap } from "@/lib/pmp";
 import { AddSalesLineForm } from "../add-line-form";
 import {
   addSalesLine,
@@ -64,20 +65,30 @@ export default async function SalesOrderDetailPage({
     marginTtc = Math.round((totals.ttc - costTtc) * 100) / 100;
   }
 
+  // Pour le formulaire d'ajout de ligne : le PU vente est pré-rempli avec le
+  // PMP vente en cours de la pièce (le prix de référence n'existe plus).
   const parts =
     canManage && isDraft
-      ? await prisma.part.findMany({
-          where: { active: true },
-          orderBy: { reference: "asc" },
-          select: {
-            id: true,
-            reference: true,
-            name: true,
-            salePriceHt: true,
-            vatRate: true,
-            stockQty: true,
-          },
-        })
+      ? await (async () => {
+          const [rows, salePmpMap] = await Promise.all([
+            prisma.part.findMany({
+              where: { active: true },
+              orderBy: { reference: "asc" },
+              select: {
+                id: true,
+                reference: true,
+                name: true,
+                vatRate: true,
+                stockQty: true,
+              },
+            }),
+            partsSalePmpMap(),
+          ]);
+          return rows.map((p) => ({
+            ...p,
+            pmpVente: salePmpMap.get(p.id) ?? null,
+          }));
+        })()
       : [];
 
   return (

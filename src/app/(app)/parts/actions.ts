@@ -29,8 +29,6 @@ const partSchema = z.object({
   brand: optionalText.optional(),
   categoryId: optionalText.optional(),
   supplierId: optionalText.optional(),
-  purchasePriceHt: optionalNumber,
-  salePriceHt: optionalNumber,
   vatRate: z
     .string()
     .trim()
@@ -70,8 +68,6 @@ export async function createPart(formData: FormData) {
       brand: data.brand,
       categoryId: data.categoryId,
       supplierId: data.supplierId,
-      purchasePriceHt: data.purchasePriceHt,
-      salePriceHt: data.salePriceHt,
       vatRate: data.vatRate / 100,
       reorderThreshold: data.reorderThreshold ?? 0,
       location: data.location,
@@ -123,8 +119,6 @@ export async function updatePart(formData: FormData) {
       brand: data.brand,
       categoryId: data.categoryId ?? null,
       supplierId: data.supplierId ?? null,
-      purchasePriceHt: data.purchasePriceHt ?? null,
-      salePriceHt: data.salePriceHt ?? null,
       vatRate: data.vatRate / 100,
       reorderThreshold: data.reorderThreshold ?? 0,
       location: data.location ?? null,

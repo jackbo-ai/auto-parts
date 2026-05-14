@@ -10,13 +10,13 @@ export type PartOption = {
   id: string;
   reference: string;
   name: string;
-  salePriceHt: number | null;
+  pmpVente: number | null;
   vatRate: number;
   stockQty: number;
 };
 
-// Sélectionne une pièce et pré-remplit le prix de vente / la TVA depuis la
-// fiche pièce. Le stock disponible est rappelé à titre indicatif.
+// Sélectionne une pièce et pré-remplit le prix de vente (PMP vente en cours) /
+// la TVA. Le stock disponible est rappelé à titre indicatif.
 export function AddSalesLineForm({
   salesOrderId,
   parts,
@@ -74,7 +74,7 @@ export function AddSalesLineForm({
             min="0"
             required
             key={partId}
-            defaultValue={selected?.salePriceHt ?? ""}
+            defaultValue={selected?.pmpVente ?? ""}
           />
         </div>
 

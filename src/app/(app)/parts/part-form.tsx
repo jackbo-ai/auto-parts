@@ -15,8 +15,6 @@ type PartValues = {
   brand: string | null;
   categoryId: string | null;
   supplierId: string | null;
-  purchasePriceHt: number | null;
-  salePriceHt: number | null;
   vatRate: number;
   reorderThreshold: number;
   location: string | null;
@@ -136,9 +134,9 @@ export function PartForm({
 
       <section className="space-y-4 rounded-lg border bg-card p-4">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          Achat & vente
+          Fournisseur & TVA
         </h2>
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Fournisseur" htmlFor="supplierId">
             <Select
               id="supplierId"
@@ -154,33 +152,10 @@ export function PartForm({
             </Select>
           </Field>
           <Field
-            label="Prix d'achat HT (€)"
-            htmlFor="purchasePriceHt"
+            label="TVA (%)"
+            htmlFor="vatRate"
+            hint="Le prix d'achat et le prix de vente ne se saisissent pas ici : ils se constituent via les commandes (PMP)."
           >
-            <Input
-              id="purchasePriceHt"
-              name="purchasePriceHt"
-              type="number"
-              step="0.01"
-              min="0"
-              defaultValue={part?.purchasePriceHt ?? ""}
-            />
-          </Field>
-          <Field
-            label="Prix de vente HT (€)"
-            htmlFor="salePriceHt"
-            hint="Optionnel — peut être renseigné plus tard."
-          >
-            <Input
-              id="salePriceHt"
-              name="salePriceHt"
-              type="number"
-              step="0.01"
-              min="0"
-              defaultValue={part?.salePriceHt ?? ""}
-            />
-          </Field>
-          <Field label="TVA (%)" htmlFor="vatRate">
             <Input
               id="vatRate"
               name="vatRate"

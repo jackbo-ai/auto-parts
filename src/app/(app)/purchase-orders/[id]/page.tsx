@@ -10,6 +10,7 @@ import { ConfirmSubmit } from "@/components/confirm-submit";
 import { formatDate, formatEuro } from "@/lib/utils";
 import { lineTotals, orderTotals } from "@/lib/totals";
 import { PURCHASE_STATUS_BADGE, PURCHASE_STATUS_LABELS } from "@/lib/orders";
+import { partsPmpMap } from "@/lib/pmp";
 import { AddPurchaseLineForm } from "../add-line-form";
 import {
   addPurchaseLine,
@@ -48,19 +49,29 @@ export default async function PurchaseOrderDetailPage({
   const isDraft = order.status === PurchaseOrderStatus.DRAFT;
   const isOrdered = order.status === PurchaseOrderStatus.ORDERED;
 
+  // Pour le formulaire d'ajout de ligne : le PU achat est pré-rempli avec le
+  // PMP achat en cours de la pièce (le prix de référence n'existe plus).
   const parts =
     canManage && isDraft
-      ? await prisma.part.findMany({
-          where: { active: true },
-          orderBy: { reference: "asc" },
-          select: {
-            id: true,
-            reference: true,
-            name: true,
-            purchasePriceHt: true,
-            vatRate: true,
-          },
-        })
+      ? await (async () => {
+          const [rows, pmpAchatMap] = await Promise.all([
+            prisma.part.findMany({
+              where: { active: true },
+              orderBy: { reference: "asc" },
+              select: {
+                id: true,
+                reference: true,
+                name: true,
+                vatRate: true,
+              },
+            }),
+            partsPmpMap(),
+          ]);
+          return rows.map((p) => ({
+            ...p,
+            pmpAchat: pmpAchatMap.get(p.id) ?? null,
+          }));
+        })()
       : [];
 
   return (

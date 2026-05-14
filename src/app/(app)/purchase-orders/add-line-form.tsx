@@ -10,12 +10,12 @@ export type PartOption = {
   id: string;
   reference: string;
   name: string;
-  purchasePriceHt: number | null;
+  pmpAchat: number | null;
   vatRate: number;
 };
 
-// Sélectionne une pièce et pré-remplit le prix d'achat / la TVA depuis la
-// fiche pièce. L'utilisateur reste libre de les ajuster pour cette commande.
+// Sélectionne une pièce et pré-remplit le prix d'achat (PMP achat en cours) /
+// la TVA. L'utilisateur reste libre de les ajuster pour cette commande.
 export function AddPurchaseLineForm({
   purchaseOrderId,
   parts,
@@ -72,7 +72,7 @@ export function AddPurchaseLineForm({
           min="0"
           required
           key={partId}
-          defaultValue={selected?.purchasePriceHt ?? ""}
+          defaultValue={selected?.pmpAchat ?? ""}
         />
       </div>
 

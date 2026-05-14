@@ -188,7 +188,7 @@ export async function deliverSalesOrder(formData: FormData) {
       for (const line of order.lines) {
         const part = await tx.part.findUnique({
           where: { id: line.partId },
-          select: { reference: true, stockQty: true, purchasePriceHt: true },
+          select: { reference: true, stockQty: true },
         });
         if (!part) throw new Error("Pièce introuvable sur une ligne.");
 
@@ -215,8 +215,8 @@ export async function deliverSalesOrder(formData: FormData) {
         });
 
         // Fige le coût d'achat unitaire au moment de la livraison : on prend le
-        // PMP à date, calculé depuis l'historique des achats réceptionnés. À
-        // défaut d'historique, repli sur le prix d'achat de référence.
+        // PMP à date, calculé depuis l'historique des achats réceptionnés.
+        // Reste null si la pièce n'a encore aucun achat réceptionné.
         const costLines = await tx.purchaseOrderLine.findMany({
           where: {
             partId: line.partId,
@@ -237,7 +237,7 @@ export async function deliverSalesOrder(formData: FormData) {
         );
         await tx.salesOrderLine.update({
           where: { id: line.id },
-          data: { unitCostHt: pmp ?? part.purchasePriceHt },
+          data: { unitCostHt: pmp },
         });
       }
 

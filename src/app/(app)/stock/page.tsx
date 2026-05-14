@@ -9,11 +9,12 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/permissions";
 import { Badge } from "@/components/ui/badge";
 import { formatDateTime, formatEuro, formatNumber } from "@/lib/utils";
+import { partsPmpMap } from "@/lib/pmp";
 
 export default async function StockPage() {
   await requireUser();
 
-  const [parts, recentMovements] = await Promise.all([
+  const [parts, recentMovements, pmpAchatMap] = await Promise.all([
     prisma.part.findMany({
       where: { active: true },
       select: {
@@ -22,7 +23,6 @@ export default async function StockPage() {
         name: true,
         stockQty: true,
         reorderThreshold: true,
-        purchasePriceHt: true,
         location: true,
       },
       orderBy: { reference: "asc" },
@@ -35,14 +35,16 @@ export default async function StockPage() {
         createdBy: { select: { name: true } },
       },
     }),
+    partsPmpMap(),
   ]);
 
   const outOfStock = parts.filter((p) => p.stockQty <= 0);
   const lowStock = parts.filter(
     (p) => p.stockQty > 0 && p.stockQty <= p.reorderThreshold,
   );
+  // Valeur du stock au PMP achat (le coût de référence figé n'existe plus).
   const stockValue = parts.reduce(
-    (sum, p) => sum + (p.purchasePriceHt ?? 0) * p.stockQty,
+    (sum, p) => sum + (pmpAchatMap.get(p.id) ?? 0) * p.stockQty,
     0,
   );
 
@@ -51,7 +53,7 @@ export default async function StockPage() {
       <div>
         <h1 className="text-2xl font-semibold">Stock</h1>
         <p className="text-sm text-muted-foreground">
-          Valeur totale (prix d&apos;achat HT) : {formatEuro(stockValue)}
+          Valeur totale (PMP achat HT) : {formatEuro(stockValue)}
         </p>
       </div>
 

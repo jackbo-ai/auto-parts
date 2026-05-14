@@ -211,9 +211,6 @@ export default async function PartDetailPage({
               <InfoRow label="Emplacement">
                 {part.location ?? "—"}
               </InfoRow>
-              <InfoRow label="Prix d'achat de référence HT">
-                {formatEuro(part.purchasePriceHt)}
-              </InfoRow>
               <InfoRow label="PMP achat à ce jour HT">
                 {pmpAchat != null ? (
                   <span className="font-medium">{formatEuro(pmpAchat)}</span>
@@ -222,9 +219,6 @@ export default async function PartDetailPage({
                     — aucun achat réceptionné
                   </span>
                 )}
-              </InfoRow>
-              <InfoRow label="Prix de vente de référence HT">
-                {formatEuro(part.salePriceHt)}
               </InfoRow>
               <InfoRow label="PMP vente à ce jour HT">
                 {pmpVente != null ? (
@@ -235,8 +229,8 @@ export default async function PartDetailPage({
                   </span>
                 )}
               </InfoRow>
-              <InfoRow label="Prix de vente de référence TTC">
-                {formatEuro(htToTtc(part.salePriceHt, part.vatRate))}
+              <InfoRow label="PMP vente à ce jour TTC">
+                {formatEuro(htToTtc(pmpVente, part.vatRate))}
                 <span className="ml-1 text-xs text-muted-foreground">
                   (TVA {Math.round(part.vatRate * 1000) / 10}%)
                 </span>

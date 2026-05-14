@@ -20,6 +20,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DigitalReadout } from "@/components/dashboard/digital-readout";
 import { formatDateTime, formatEuro, formatNumber } from "@/lib/utils";
 import { orderTotals } from "@/lib/totals";
+import { partsPmpMap } from "@/lib/pmp";
 
 export default async function DashboardPage() {
   const [
@@ -29,6 +30,7 @@ export default async function DashboardPage() {
     recentMovements,
     receivedPurchases,
     billedSales,
+    pmpAchatMap,
   ] = await Promise.all([
     prisma.part.findMany({
       where: { active: true },
@@ -38,7 +40,6 @@ export default async function DashboardPage() {
         name: true,
         stockQty: true,
         reorderThreshold: true,
-        purchasePriceHt: true,
       },
     }),
     prisma.supplier.count(),
@@ -72,11 +73,13 @@ export default async function DashboardPage() {
         },
       },
     }),
+    partsPmpMap(),
   ]);
 
   const lowStock = parts.filter((p) => p.stockQty <= p.reorderThreshold);
+  // Valeur du stock au PMP achat (le coût de référence figé n'existe plus).
   const stockValue = parts.reduce(
-    (sum, p) => sum + (p.purchasePriceHt ?? 0) * p.stockQty,
+    (sum, p) => sum + (pmpAchatMap.get(p.id) ?? 0) * p.stockQty,
     0,
   );
 
