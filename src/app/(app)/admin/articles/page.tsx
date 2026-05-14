@@ -25,6 +25,7 @@ export default async function AdminArticlesPage({
     updated?: string;
     skipped?: string;
     error?: string;
+    line?: string;
   }>;
 }) {
   await requireRole([Role.ADMIN]);
@@ -35,7 +36,12 @@ export default async function AdminArticlesPage({
   const updated = Number(params.updated ?? 0);
   const skipped = Number(params.skipped ?? 0);
   const hasResult = params.created != null || params.updated != null;
-  const errorMessage = params.error ? ERROR_MESSAGES[params.error] : null;
+  let errorMessage = params.error ? ERROR_MESSAGES[params.error] ?? null : null;
+  if (params.error === "missingref") {
+    errorMessage = `${
+      params.line ? `Ligne ${params.line} : ` : ""
+    }référence TecDoc manquante. Le fichier entier a été rejeté — aucun article importé.`;
+  }
 
   return (
     <div className="mx-auto max-w-2xl space-y-5">
@@ -110,6 +116,10 @@ export default async function AdminArticlesPage({
           <li>
             Les en-têtes sont reconnus automatiquement (référence / réf /
             TecDoc, et désignation / libellé / nom).
+          </li>
+          <li>
+            La référence TecDoc est obligatoire sur chaque ligne : une seule
+            ligne sans référence fait rejeter le fichier entier.
           </li>
           <li>
             Une référence déjà présente voit sa désignation mise à jour, sans

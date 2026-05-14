@@ -69,7 +69,12 @@ export async function importArticles(formData: FormData) {
     const row = rows[i] as unknown[];
     const reference = String(row[refIdx] ?? "").trim();
     const name = String(row[nameIdx] ?? "").trim();
-    if (!reference || !name) {
+    // La référence TecDoc est l'identifiant pivot : une seule ligne sans
+    // référence invalide tout le fichier — rien n'est importé.
+    if (!reference) {
+      redirect(`/admin/articles?error=missingref&line=${i + 1}`);
+    }
+    if (!name) {
       skipped++;
       continue;
     }

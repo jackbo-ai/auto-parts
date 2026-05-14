@@ -25,16 +25,25 @@ function Field({
   children,
   hint,
   className,
+  required,
 }: {
   label: string;
   htmlFor?: string;
   children: React.ReactNode;
   hint?: string;
   className?: string;
+  required?: boolean;
 }) {
   return (
     <div className={`space-y-1.5 ${className ?? ""}`}>
-      <Label htmlFor={htmlFor}>{label}</Label>
+      <Label htmlFor={htmlFor}>
+        {label}
+        {required && (
+          <span className="ml-0.5 text-destructive" aria-hidden>
+            *
+          </span>
+        )}
+      </Label>
       {children}
       {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
     </div>
@@ -71,6 +80,7 @@ export function PartForm({
             htmlFor="reference"
             className="sm:col-span-2"
             hint="Identifiant pivot de la pièce."
+            required
           >
             <Input
               id="reference"
@@ -84,6 +94,7 @@ export function PartForm({
             label="Désignation"
             htmlFor="name"
             className="sm:col-span-2"
+            required
           >
             <Input
               id="name"
