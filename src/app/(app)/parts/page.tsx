@@ -20,7 +20,12 @@ function stockBadge(qty: number, threshold: number) {
 export default async function PartsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; categoryId?: string; status?: string }>;
+  searchParams: Promise<{
+    q?: string;
+    categoryId?: string;
+    brandId?: string;
+    status?: string;
+  }>;
 }) {
   const me = await requireUser();
   const params = await searchParams;
@@ -35,23 +40,30 @@ export default async function PartsPage({
     ];
   }
   if (params.categoryId) where.categoryId = params.categoryId;
+  if (params.brandId) where.brandId = params.brandId;
   if (params.status === "active") where.active = true;
   if (params.status === "inactive") where.active = false;
 
-  const [parts, categories, pmpMap, salePmpMap] = await Promise.all([
-    prisma.part.findMany({
-      where,
-      include: {
-        category: { select: { name: true } },
-        brand: { select: { name: true } },
-      },
-      orderBy: { reference: "asc" },
-      take: 300,
-    }),
-    prisma.category.findMany({ orderBy: { name: "asc" } }),
-    partsPmpMap(),
-    partsSalePmpMap(),
-  ]);
+  const [parts, categories, brands, allRefs, pmpMap, salePmpMap] =
+    await Promise.all([
+      prisma.part.findMany({
+        where,
+        include: {
+          category: { select: { name: true } },
+          brand: { select: { name: true } },
+        },
+        orderBy: { reference: "asc" },
+        take: 300,
+      }),
+      prisma.category.findMany({ orderBy: { name: "asc" } }),
+      prisma.brand.findMany({ orderBy: { name: "asc" } }),
+      prisma.part.findMany({
+        select: { reference: true, name: true },
+        orderBy: { reference: "asc" },
+      }),
+      partsPmpMap(),
+      partsSalePmpMap(),
+    ]);
 
   return (
     <div className="space-y-4">
@@ -83,9 +95,18 @@ export default async function PartsPage({
           <Input
             name="q"
             defaultValue={q}
+            list="parts-refs"
+            autoComplete="off"
             placeholder="Référence, OEM, désignation…"
             className="pl-8"
           />
+          <datalist id="parts-refs">
+            {allRefs.map((p) => (
+              <option key={p.reference} value={p.reference}>
+                {p.name}
+              </option>
+            ))}
+          </datalist>
         </div>
         <Select
           name="categoryId"
@@ -96,6 +117,18 @@ export default async function PartsPage({
           {categories.map((c) => (
             <option key={c.id} value={c.id}>
               {c.name}
+            </option>
+          ))}
+        </Select>
+        <Select
+          name="brandId"
+          defaultValue={params.brandId ?? ""}
+          className="max-w-xs"
+        >
+          <option value="">Toutes les marques</option>
+          {brands.map((b) => (
+            <option key={b.id} value={b.id}>
+              {b.name}
             </option>
           ))}
         </Select>
@@ -111,7 +144,7 @@ export default async function PartsPage({
         <Button type="submit" variant="secondary" size="sm">
           Filtrer
         </Button>
-        {(q || params.categoryId || params.status) && (
+        {(q || params.categoryId || params.brandId || params.status) && (
           <Button asChild variant="ghost" size="sm">
             <Link href="/parts">Réinitialiser</Link>
           </Button>
