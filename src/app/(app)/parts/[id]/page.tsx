@@ -18,12 +18,14 @@ import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { ConfirmSubmit } from "@/components/confirm-submit";
 import {
+  formatDate,
   formatDateTime,
   formatEuro,
   formatNumber,
   htToTtc,
   margin,
 } from "@/lib/utils";
+import { partCostHistory, weightedAverageCost } from "@/lib/pmp";
 import {
   addFitment,
   deleteFitment,
@@ -73,6 +75,20 @@ export default async function PartDetailPage({
   const canManage = canManageCatalog(me.role);
   const m = margin(part.purchasePriceHt, part.salePriceHt);
   const lowStock = part.stockQty <= part.reorderThreshold;
+
+  // Historique des coûts d'achat (commandes réceptionnées) et PMP à ce jour.
+  const costHistory = await partCostHistory(id);
+  const pmp = weightedAverageCost(costHistory);
+  let runQty = 0;
+  let runValue = 0;
+  const costRows = costHistory.map((e) => {
+    runQty += e.quantity;
+    runValue += e.quantity * e.unitPriceHt;
+    return {
+      ...e,
+      runningPmp: Math.round((runValue / runQty) * 100) / 100,
+    };
+  });
 
   return (
     <div className="space-y-5">
@@ -178,8 +194,17 @@ export default async function PartDetailPage({
               <InfoRow label="Emplacement">
                 {part.location ?? "—"}
               </InfoRow>
-              <InfoRow label="Prix d'achat HT">
+              <InfoRow label="Prix d'achat de référence HT">
                 {formatEuro(part.purchasePriceHt)}
+              </InfoRow>
+              <InfoRow label="PMP à ce jour HT">
+                {pmp != null ? (
+                  <span className="font-medium">{formatEuro(pmp)}</span>
+                ) : (
+                  <span className="text-muted-foreground">
+                    — aucun achat réceptionné
+                  </span>
+                )}
               </InfoRow>
               <InfoRow label="Prix de vente HT">
                 {formatEuro(part.salePriceHt)}
@@ -209,6 +234,72 @@ export default async function PartDetailPage({
                   Description
                 </div>
                 <p className="whitespace-pre-wrap">{part.description}</p>
+              </div>
+            )}
+          </div>
+
+          {/* Historique des coûts d'achat → PMP */}
+          <div className="rounded-lg border bg-card p-4">
+            <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+              Historique des coûts d&apos;achat ({costRows.length})
+            </h2>
+            {costRows.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Aucune commande d&apos;achat réceptionnée pour cette pièce. Le
+                PMP se constituera dès la première réception.
+              </p>
+            ) : (
+              <div className="overflow-hidden rounded-md border">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/60 text-left text-xs uppercase text-muted-foreground">
+                    <tr>
+                      <th className="px-3 py-2">Date</th>
+                      <th className="px-3 py-2">Commande</th>
+                      <th className="px-3 py-2 text-right">Qté</th>
+                      <th className="px-3 py-2 text-right">PU achat HT</th>
+                      <th className="px-3 py-2 text-right">PMP cumulé</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {costRows.map((e, i) => (
+                      <tr key={`${e.purchaseOrderId}-${i}`} className="border-t">
+                        <td className="px-3 py-2 text-muted-foreground">
+                          {formatDate(e.date)}
+                        </td>
+                        <td className="px-3 py-2">
+                          <Link
+                            href={`/purchase-orders/${e.purchaseOrderId}`}
+                            className="font-mono text-xs text-primary hover:underline"
+                          >
+                            {e.reference}
+                          </Link>
+                        </td>
+                        <td className="px-3 py-2 text-right tabular-nums">
+                          {e.quantity}
+                        </td>
+                        <td className="px-3 py-2 text-right tabular-nums">
+                          {formatEuro(e.unitPriceHt)}
+                        </td>
+                        <td className="px-3 py-2 text-right tabular-nums">
+                          {formatEuro(e.runningPmp)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot className="border-t bg-muted/30">
+                    <tr>
+                      <td
+                        colSpan={4}
+                        className="px-3 py-2 text-right text-xs font-semibold uppercase"
+                      >
+                        PMP à ce jour
+                      </td>
+                      <td className="px-3 py-2 text-right font-semibold tabular-nums">
+                        {formatEuro(pmp)}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
               </div>
             )}
           </div>

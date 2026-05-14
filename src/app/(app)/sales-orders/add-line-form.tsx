@@ -10,7 +10,7 @@ export type PartOption = {
   id: string;
   reference: string;
   name: string;
-  salePriceHt: number;
+  salePriceHt: number | null;
   vatRate: number;
   stockQty: number;
 };

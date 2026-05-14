@@ -3,10 +3,16 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { Role, SalesOrderStatus, StockMovementType } from "@prisma/client";
+import {
+  PurchaseOrderStatus,
+  Role,
+  SalesOrderStatus,
+  StockMovementType,
+} from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/permissions";
 import { buildReference } from "@/lib/orders";
+import { weightedAverageCost } from "@/lib/pmp";
 
 const MANAGE_ROLES = [Role.ADMIN, Role.MANAGER];
 
@@ -185,10 +191,31 @@ export async function deliverSalesOrder(formData: FormData) {
         where: { id: line.partId },
         data: { stockQty: resulting },
       });
-      // Fige le coût d'achat unitaire au moment de la livraison.
+
+      // Fige le coût d'achat unitaire au moment de la livraison : on prend le
+      // PMP à date, calculé depuis l'historique des achats réceptionnés. À
+      // défaut d'historique, repli sur le prix d'achat de référence.
+      const costLines = await tx.purchaseOrderLine.findMany({
+        where: {
+          partId: line.partId,
+          purchaseOrder: { status: PurchaseOrderStatus.RECEIVED },
+        },
+        select: {
+          quantity: true,
+          unitPriceHt: true,
+          purchaseOrder: { select: { orderDate: true } },
+        },
+      });
+      const pmp = weightedAverageCost(
+        costLines.map((c) => ({
+          quantity: c.quantity,
+          unitPriceHt: c.unitPriceHt,
+          date: c.purchaseOrder.orderDate,
+        })),
+      );
       await tx.salesOrderLine.update({
         where: { id: line.id },
-        data: { unitCostHt: part.purchasePriceHt },
+        data: { unitCostHt: pmp ?? part.purchasePriceHt },
       });
     }
 

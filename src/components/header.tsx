@@ -26,7 +26,7 @@ const NAV = [
 
 export function Header({ user }: { user: SessionUser }) {
   const nav = canManageUsers(user.role)
-    ? [...NAV, { href: "/admin/users", label: "Admin", icon: Settings }]
+    ? [...NAV, { href: "/admin", label: "Admin", icon: Settings }]
     : NAV;
 
   return (

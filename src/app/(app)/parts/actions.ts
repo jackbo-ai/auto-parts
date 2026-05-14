@@ -30,12 +30,7 @@ const partSchema = z.object({
   categoryId: optionalText.optional(),
   supplierId: optionalText.optional(),
   purchasePriceHt: optionalNumber,
-  salePriceHt: z
-    .string()
-    .trim()
-    .min(1, "Le prix de vente est obligatoire")
-    .transform((v) => Number(v))
-    .pipe(z.number().nonnegative()),
+  salePriceHt: optionalNumber,
   vatRate: z
     .string()
     .trim()
@@ -81,6 +76,9 @@ export async function createPart(formData: FormData) {
       reorderThreshold: data.reorderThreshold ?? 0,
       location: data.location,
       stockQty: initialStock,
+      // initialStock crée un mouvement d'entrée mais PAS d'historique de
+      // coût d'achat : le PMP ne se constitue qu'avec les commandes d'achat
+      // réceptionnées (voir lib/pmp.ts).
       movements:
         initialStock > 0
           ? {
@@ -126,7 +124,7 @@ export async function updatePart(formData: FormData) {
       categoryId: data.categoryId ?? null,
       supplierId: data.supplierId ?? null,
       purchasePriceHt: data.purchasePriceHt ?? null,
-      salePriceHt: data.salePriceHt,
+      salePriceHt: data.salePriceHt ?? null,
       vatRate: data.vatRate / 100,
       reorderThreshold: data.reorderThreshold ?? 0,
       location: data.location ?? null,

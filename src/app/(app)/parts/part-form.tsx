@@ -16,7 +16,7 @@ type PartValues = {
   categoryId: string | null;
   supplierId: string | null;
   purchasePriceHt: number | null;
-  salePriceHt: number;
+  salePriceHt: number | null;
   vatRate: number;
   reorderThreshold: number;
   location: string | null;
@@ -166,14 +166,17 @@ export function PartForm({
               defaultValue={part?.purchasePriceHt ?? ""}
             />
           </Field>
-          <Field label="Prix de vente HT (€)" htmlFor="salePriceHt">
+          <Field
+            label="Prix de vente HT (€)"
+            htmlFor="salePriceHt"
+            hint="Optionnel — peut être renseigné plus tard."
+          >
             <Input
               id="salePriceHt"
               name="salePriceHt"
               type="number"
               step="0.01"
               min="0"
-              required
               defaultValue={part?.salePriceHt ?? ""}
             />
           </Field>

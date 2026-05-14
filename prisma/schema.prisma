@@ -83,9 +83,12 @@ model Part {
   supplierId String?
   supplier   Supplier? @relation(fields: [supplierId], references: [id])
 
-  // Prix en EUR hors taxes. Le prix de vente est obligatoire.
+  // Prix en EUR hors taxes. Tous deux optionnels : un article peut être
+  // initialisé (import TecDoc) avant d'avoir un tarif. Le coût d'achat de
+  // référence est `purchasePriceHt` ; le coût réel suivi est le PMP calculé
+  // à partir de l'historique des commandes d'achat réceptionnées.
   purchasePriceHt Float?
-  salePriceHt     Float
+  salePriceHt     Float?
   vatRate         Float @default(0.2)
 
   // Stock dénormalisé : la quantité de référence vit ici et est mise à jour

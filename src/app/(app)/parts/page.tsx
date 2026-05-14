@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { formatEuro, formatNumber } from "@/lib/utils";
+import { partsPmpMap } from "@/lib/pmp";
 
 function stockBadge(qty: number, threshold: number) {
   if (qty <= 0) return "border-destructive/30 bg-destructive/10 text-destructive";
@@ -38,7 +39,7 @@ export default async function PartsPage({
   if (params.status === "active") where.active = true;
   if (params.status === "inactive") where.active = false;
 
-  const [parts, categories] = await Promise.all([
+  const [parts, categories, pmpMap] = await Promise.all([
     prisma.part.findMany({
       where,
       include: { category: { select: { name: true } } },
@@ -46,6 +47,7 @@ export default async function PartsPage({
       take: 300,
     }),
     prisma.category.findMany({ orderBy: { name: "asc" } }),
+    partsPmpMap(),
   ]);
 
   return (
@@ -150,8 +152,13 @@ export default async function PartsPage({
                 </Badge>
               )}
             </div>
-            <div className="mt-1 text-sm font-medium tabular-nums">
-              {formatEuro(p.salePriceHt)} HT
+            <div className="mt-1 flex gap-3 text-sm tabular-nums">
+              <span className="font-medium">
+                {formatEuro(p.salePriceHt)} HT
+              </span>
+              <span className="text-muted-foreground">
+                PMP {formatEuro(pmpMap.get(p.id))}
+              </span>
             </div>
           </Link>
         ))}
@@ -166,6 +173,7 @@ export default async function PartsPage({
               <th className="px-4 py-3">Désignation</th>
               <th className="px-4 py-3">Catégorie</th>
               <th className="px-4 py-3">Prix vente HT</th>
+              <th className="px-4 py-3">PMP HT</th>
               <th className="px-4 py-3">Stock</th>
             </tr>
           </thead>
@@ -173,7 +181,7 @@ export default async function PartsPage({
             {parts.length === 0 && (
               <tr>
                 <td
-                  colSpan={5}
+                  colSpan={6}
                   className="px-4 py-12 text-center text-muted-foreground"
                 >
                   Aucune pièce.
@@ -220,6 +228,9 @@ export default async function PartsPage({
                 </td>
                 <td className="px-4 py-3 tabular-nums">
                   {formatEuro(p.salePriceHt)}
+                </td>
+                <td className="px-4 py-3 tabular-nums text-muted-foreground">
+                  {formatEuro(pmpMap.get(p.id))}
                 </td>
                 <td className="px-4 py-3">
                   <Badge className={stockBadge(p.stockQty, p.reorderThreshold)}>
