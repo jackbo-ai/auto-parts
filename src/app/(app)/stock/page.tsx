@@ -5,17 +5,32 @@ import {
   ArrowDownRight,
   ArrowUpRight,
   Boxes,
+  CalendarClock,
+  PackageCheck,
   PackageX,
 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/permissions";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { DigitalReadout } from "@/components/dashboard/digital-readout";
-import { formatDateTime, formatEuro, formatNumber } from "@/lib/utils";
+import {
+  formatDate,
+  formatDateTime,
+  formatEuro,
+  formatNumber,
+} from "@/lib/utils";
 import { partsPmpMap } from "@/lib/pmp";
 
-export default async function StockPage() {
+export default async function StockPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ partId?: string; date?: string }>;
+}) {
   await requireUser();
+  const params = await searchParams;
 
   const [parts, recentMovements, pmpAchatMap, inactiveCount] =
     await Promise.all([
@@ -48,11 +63,34 @@ export default async function StockPage() {
   // stock » est un sous-ensemble urgent mis en avant à part.
   const outOfStock = parts.filter((p) => p.stockQty <= 0);
   const lowStock = parts.filter((p) => p.stockQty <= p.reorderThreshold);
+  const inStock = parts.filter((p) => p.stockQty > 0);
   // Valeur du stock au PMP achat (le coût de référence figé n'existe plus).
   const stockValue = parts.reduce(
     (sum, p) => sum + (pmpAchatMap.get(p.id) ?? 0) * p.stockQty,
     0,
   );
+
+  // Stock à une date : on reconstitue le stock d'une pièce à une date donnée
+  // via le dernier mouvement antérieur (StockMovement.resulting est figé à
+  // chaque mouvement). Sans mouvement antérieur, le stock était à 0.
+  const filterPartId = params.partId?.trim() || null;
+  const today = new Date().toISOString().slice(0, 10);
+  const filterDate = params.date?.trim() || today;
+  const filterPart = filterPartId
+    ? parts.find((p) => p.id === filterPartId) ?? null
+    : null;
+  let stockAtDate: number | null = null;
+  if (filterPart) {
+    const lastMovement = await prisma.stockMovement.findFirst({
+      where: {
+        partId: filterPart.id,
+        createdAt: { lte: new Date(`${filterDate}T23:59:59.999`) },
+      },
+      orderBy: { createdAt: "desc" },
+      select: { resulting: true },
+    });
+    stockAtDate = lastMovement?.resulting ?? 0;
+  }
 
   return (
     <div className="space-y-6">
@@ -63,7 +101,7 @@ export default async function StockPage() {
         </p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         <DigitalReadout
           label="Pièces en rupture"
           value={formatNumber(outOfStock.length)}
@@ -77,6 +115,12 @@ export default async function StockPage() {
           icon={<AlertTriangle className="h-3.5 w-3.5" />}
         />
         <DigitalReadout
+          label="Articles en stock"
+          value={formatNumber(inStock.length)}
+          tone="success"
+          icon={<PackageCheck className="h-3.5 w-3.5" />}
+        />
+        <DigitalReadout
           label="Références actives"
           value={formatNumber(parts.length)}
           icon={<Boxes className="h-3.5 w-3.5" />}
@@ -87,6 +131,56 @@ export default async function StockPage() {
           icon={<Archive className="h-3.5 w-3.5" />}
         />
       </div>
+
+      <section className="space-y-2">
+        <h2 className="text-sm font-medium text-muted-foreground">
+          Stock à une date
+        </h2>
+        <div className="grid gap-4 lg:grid-cols-2">
+          <form
+            action="/stock"
+            className="flex flex-wrap items-end gap-2 rounded-lg border bg-card p-4"
+          >
+            <div className="flex-1 space-y-1">
+              <label
+                htmlFor="partId"
+                className="text-xs text-muted-foreground"
+              >
+                Article
+              </label>
+              <Select id="partId" name="partId" defaultValue={filterPartId ?? ""}>
+                <option value="">— Choisir un article —</option>
+                {parts.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.reference} — {p.name}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <label htmlFor="date" className="text-xs text-muted-foreground">
+                Date
+              </label>
+              <Input id="date" name="date" type="date" defaultValue={filterDate} />
+            </div>
+            <Button type="submit" variant="secondary">
+              Calculer
+            </Button>
+          </form>
+          <DigitalReadout
+            label={
+              filterPart
+                ? `${filterPart.reference} au ${formatDate(filterDate)}`
+                : "Stock à une date"
+            }
+            value={
+              stockAtDate != null ? formatNumber(stockAtDate) : "—"
+            }
+            tone="info"
+            icon={<CalendarClock className="h-3.5 w-3.5" />}
+          />
+        </div>
+      </section>
 
       <section className="space-y-2">
         <h2 className="flex items-center gap-2 text-base font-medium">
