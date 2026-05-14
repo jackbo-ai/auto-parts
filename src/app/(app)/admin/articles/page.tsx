@@ -133,18 +133,40 @@ export default async function AdminArticlesPage({
             </tbody>
           </table>
         </div>
-        <ul className="ml-5 list-disc text-xs text-muted-foreground">
+        <div className="space-y-1.5 text-xs text-muted-foreground">
+          <p className="font-medium text-foreground">
+            Les quatre colonnes attendues :
+          </p>
+          <ul className="ml-5 list-disc space-y-1">
+            <li>
+              <strong>Référence (TecDoc)</strong> — identifiant pivot de la
+              pièce. Obligatoire.
+            </li>
+            <li>
+              <strong>Désignation</strong> — libellé de l&apos;article. Une
+              ligne sans désignation est ignorée.
+            </li>
+            <li>
+              <strong>Marque</strong> — équipementier de la pièce. Obligatoire ;
+              la marque est créée automatiquement si elle n&apos;existe pas
+              encore en base.
+            </li>
+            <li>
+              <strong>Catégorie</strong> — famille de pièces. Obligatoire ; la
+              catégorie est créée automatiquement si elle n&apos;existe pas
+              encore en base.
+            </li>
+          </ul>
+        </div>
+        <ul className="ml-5 list-disc space-y-1 text-xs text-muted-foreground">
           <li>
-            Les en-têtes sont reconnus automatiquement (référence / réf /
-            TecDoc, désignation / libellé / nom, marque, catégorie / famille).
+            Les en-têtes sont reconnus quelle que soit leur casse (référence /
+            réf / TecDoc, désignation / libellé / nom, marque, catégorie /
+            famille).
           </li>
           <li>
-            Référence, marque et catégorie sont obligatoires sur chaque ligne :
-            une seule ligne incomplète fait rejeter le fichier entier.
-          </li>
-          <li>
-            Les marques et catégories absentes de la base sont créées
-            automatiquement à l&apos;import.
+            Une seule ligne sans référence, sans marque ou sans catégorie fait
+            rejeter le fichier entier — aucun article n&apos;est importé.
           </li>
           <li>
             Une référence déjà présente voit sa désignation, sa marque et sa
