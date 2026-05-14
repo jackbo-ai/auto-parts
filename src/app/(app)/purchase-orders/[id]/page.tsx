@@ -323,6 +323,14 @@ export default async function PurchaseOrderDetailPage({
           .
         </p>
       )}
+
+      <Link
+        href="/purchase-orders"
+        className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        Retour aux commandes d&apos;achat
+      </Link>
     </div>
   );
 }

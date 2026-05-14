@@ -360,6 +360,14 @@ export default async function SalesOrderDetailPage({
           .
         </p>
       )}
+
+      <Link
+        href="/sales-orders"
+        className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        Retour aux commandes client
+      </Link>
     </div>
   );
 }
