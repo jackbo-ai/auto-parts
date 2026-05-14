@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { ConfirmSubmit } from "@/components/confirm-submit";
 import { formatEuro, formatNumber } from "@/lib/utils";
+import { partsSalePmpMap } from "@/lib/pmp";
 import { deleteSupplier, updateSupplier } from "../actions";
 
 export default async function SupplierDetailPage({
@@ -21,21 +22,23 @@ export default async function SupplierDetailPage({
   const { id } = await params;
   const canManage = canManageCatalog(me.role);
 
-  const supplier = await prisma.supplier.findUnique({
-    where: { id },
-    include: {
-      parts: {
-        orderBy: { reference: "asc" },
-        select: {
-          id: true,
-          reference: true,
-          name: true,
-          salePriceHt: true,
-          stockQty: true,
+  const [supplier, salePmpMap] = await Promise.all([
+    prisma.supplier.findUnique({
+      where: { id },
+      include: {
+        parts: {
+          orderBy: { reference: "asc" },
+          select: {
+            id: true,
+            reference: true,
+            name: true,
+            stockQty: true,
+          },
         },
       },
-    },
-  });
+    }),
+    partsSalePmpMap(),
+  ]);
   if (!supplier) notFound();
 
   return (
@@ -147,7 +150,7 @@ export default async function SupplierDetailPage({
               </div>
               <div className="flex items-center gap-3 text-sm">
                 <span className="tabular-nums">
-                  {formatEuro(p.salePriceHt)}
+                  PMP vente {formatEuro(salePmpMap.get(p.id))}
                 </span>
                 <Badge className="border-border bg-muted text-muted-foreground">
                   {formatNumber(p.stockQty)} en stock
