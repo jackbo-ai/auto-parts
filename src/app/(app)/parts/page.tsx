@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { formatEuro, formatNumber } from "@/lib/utils";
-import { partsPmpMap } from "@/lib/pmp";
+import { partsPmpMap, partsSalePmpMap } from "@/lib/pmp";
 
 function stockBadge(qty: number, threshold: number) {
   if (qty <= 0) return "border-destructive/30 bg-destructive/10 text-destructive";
@@ -39,7 +39,7 @@ export default async function PartsPage({
   if (params.status === "active") where.active = true;
   if (params.status === "inactive") where.active = false;
 
-  const [parts, categories, pmpMap] = await Promise.all([
+  const [parts, categories, pmpMap, salePmpMap] = await Promise.all([
     prisma.part.findMany({
       where,
       include: { category: { select: { name: true } } },
@@ -48,6 +48,7 @@ export default async function PartsPage({
     }),
     prisma.category.findMany({ orderBy: { name: "asc" } }),
     partsPmpMap(),
+    partsSalePmpMap(),
   ]);
 
   return (
@@ -154,10 +155,10 @@ export default async function PartsPage({
             </div>
             <div className="mt-1 flex gap-3 text-sm tabular-nums">
               <span className="font-medium">
-                {formatEuro(p.salePriceHt)} HT
+                PMP vente {formatEuro(salePmpMap.get(p.id))}
               </span>
               <span className="text-muted-foreground">
-                PMP {formatEuro(pmpMap.get(p.id))}
+                PMP achat {formatEuro(pmpMap.get(p.id))}
               </span>
             </div>
           </Link>
@@ -172,8 +173,8 @@ export default async function PartsPage({
               <th className="px-4 py-3">Référence</th>
               <th className="px-4 py-3">Désignation</th>
               <th className="px-4 py-3">Catégorie</th>
-              <th className="px-4 py-3">Prix vente HT</th>
-              <th className="px-4 py-3">PMP HT</th>
+              <th className="px-4 py-3">PMP vente HT</th>
+              <th className="px-4 py-3">PMP achat HT</th>
               <th className="px-4 py-3">Stock</th>
             </tr>
           </thead>
@@ -227,7 +228,7 @@ export default async function PartsPage({
                   {p.category?.name ?? "—"}
                 </td>
                 <td className="px-4 py-3 tabular-nums">
-                  {formatEuro(p.salePriceHt)}
+                  {formatEuro(salePmpMap.get(p.id))}
                 </td>
                 <td className="px-4 py-3 tabular-nums text-muted-foreground">
                   {formatEuro(pmpMap.get(p.id))}

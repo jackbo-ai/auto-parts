@@ -12,7 +12,7 @@ import {
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/permissions";
 import { buildReference } from "@/lib/orders";
-import { weightedAverageCost } from "@/lib/pmp";
+import { weightedAveragePrice } from "@/lib/pmp";
 
 const MANAGE_ROLES = [Role.ADMIN, Role.MANAGER];
 
@@ -206,7 +206,7 @@ export async function deliverSalesOrder(formData: FormData) {
           purchaseOrder: { select: { orderDate: true } },
         },
       });
-      const pmp = weightedAverageCost(
+      const pmp = weightedAveragePrice(
         costLines.map((c) => ({
           quantity: c.quantity,
           unitPriceHt: c.unitPriceHt,

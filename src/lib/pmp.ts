@@ -1,27 +1,40 @@
-import { PurchaseOrderStatus } from "@prisma/client";
+import { PurchaseOrderStatus, SalesOrderStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
-// Le coût d'achat d'une pièce est mouvant : il dépend de la date et du prix
-// négocié à chaque commande. On ne stocke donc pas un coût figé, on le déduit
-// de l'historique des commandes d'achat réceptionnées et on calcule un PMP
+// Ni le coût d'achat ni le prix de vente d'une pièce ne sont figés : ils
+// dépendent de la date et du prix négocié à chaque commande. On ne stocke
+// donc pas de valeur figée, on les déduit de l'historique des commandes
+// (achats réceptionnés, ventes livrées/facturées) et on calcule un PMP
 // (Prix Moyen Pondéré / CUMP) à la date de consultation.
 
-export type CostEntry = {
+export type PriceEntry = {
   date: Date;
   quantity: number;
   unitPriceHt: number;
 };
 
-export type CostHistoryEntry = CostEntry & {
+export type CostHistoryEntry = PriceEntry & {
   purchaseOrderId: string;
   reference: string;
 };
 
-// PMP à une date donnée : moyenne des coûts d'achat unitaires pondérée par
-// les quantités, sur toutes les entrées dont la date est <= atDate. Renvoie
-// null si aucune entrée ne précède la date (coût pas encore connu).
-export function weightedAverageCost(
-  entries: CostEntry[],
+export type SalePriceHistoryEntry = PriceEntry & {
+  salesOrderId: string;
+  reference: string;
+};
+
+// Les ventes considérées « réelles » : livrées ou facturées — cohérent avec
+// le CA client du tableau de bord.
+const SALE_PMP_STATUSES = [
+  SalesOrderStatus.DELIVERED,
+  SalesOrderStatus.INVOICED,
+];
+
+// PMP à une date donnée : moyenne des prix unitaires pondérée par les
+// quantités, sur toutes les entrées dont la date est <= atDate. Renvoie
+// null si aucune entrée ne précède la date (prix pas encore connu).
+export function weightedAveragePrice(
+  entries: PriceEntry[],
   atDate: Date = new Date(),
 ): number | null {
   let totalQty = 0;
@@ -65,7 +78,38 @@ export async function partCostHistory(
     .sort((a, b) => a.date.getTime() - b.date.getTime());
 }
 
-// PMP de toutes les pièces en une seule requête — pour les listes catalogue.
+// Historique des prix de vente d'une pièce : une entrée par ligne de commande
+// client livrée/facturée, datée à la date de commande, du plus ancien au plus
+// récent.
+export async function partSalePriceHistory(
+  partId: string,
+): Promise<SalePriceHistoryEntry[]> {
+  const lines = await prisma.salesOrderLine.findMany({
+    where: {
+      partId,
+      salesOrder: { status: { in: SALE_PMP_STATUSES } },
+    },
+    select: {
+      quantity: true,
+      unitPriceHt: true,
+      salesOrder: {
+        select: { id: true, reference: true, orderDate: true },
+      },
+    },
+  });
+  return lines
+    .map((l) => ({
+      date: l.salesOrder.orderDate,
+      quantity: l.quantity,
+      unitPriceHt: l.unitPriceHt,
+      salesOrderId: l.salesOrder.id,
+      reference: l.salesOrder.reference,
+    }))
+    .sort((a, b) => a.date.getTime() - b.date.getTime());
+}
+
+// PMP d'achat de toutes les pièces en une seule requête — pour les listes
+// catalogue.
 export async function partsPmpMap(
   atDate: Date = new Date(),
 ): Promise<Map<string, number>> {
@@ -78,7 +122,7 @@ export async function partsPmpMap(
       purchaseOrder: { select: { orderDate: true } },
     },
   });
-  const byPart = new Map<string, CostEntry[]>();
+  const byPart = new Map<string, PriceEntry[]>();
   for (const l of lines) {
     const arr = byPart.get(l.partId) ?? [];
     arr.push({
@@ -90,7 +134,39 @@ export async function partsPmpMap(
   }
   const result = new Map<string, number>();
   for (const [partId, entries] of byPart) {
-    const pmp = weightedAverageCost(entries, atDate);
+    const pmp = weightedAveragePrice(entries, atDate);
+    if (pmp !== null) result.set(partId, pmp);
+  }
+  return result;
+}
+
+// PMP de vente de toutes les pièces en une seule requête — pour les listes
+// catalogue.
+export async function partsSalePmpMap(
+  atDate: Date = new Date(),
+): Promise<Map<string, number>> {
+  const lines = await prisma.salesOrderLine.findMany({
+    where: { salesOrder: { status: { in: SALE_PMP_STATUSES } } },
+    select: {
+      partId: true,
+      quantity: true,
+      unitPriceHt: true,
+      salesOrder: { select: { orderDate: true } },
+    },
+  });
+  const byPart = new Map<string, PriceEntry[]>();
+  for (const l of lines) {
+    const arr = byPart.get(l.partId) ?? [];
+    arr.push({
+      date: l.salesOrder.orderDate,
+      quantity: l.quantity,
+      unitPriceHt: l.unitPriceHt,
+    });
+    byPart.set(l.partId, arr);
+  }
+  const result = new Map<string, number>();
+  for (const [partId, entries] of byPart) {
+    const pmp = weightedAveragePrice(entries, atDate);
     if (pmp !== null) result.set(partId, pmp);
   }
   return result;
