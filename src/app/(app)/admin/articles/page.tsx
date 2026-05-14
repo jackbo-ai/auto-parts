@@ -13,8 +13,16 @@ const ERROR_MESSAGES: Record<string, string> = {
     "Fichier illisible. Vérifiez qu'il s'agit bien d'un CSV ou d'un fichier Excel (.xlsx).",
   empty: "Le fichier est vide ou ne contient aucune ligne de données.",
   columns:
-    "Colonnes introuvables. Le fichier doit comporter une colonne référence (ou TecDoc) et une colonne désignation.",
+    "Colonnes introuvables. Le fichier doit comporter quatre colonnes : référence (TecDoc), désignation, marque et catégorie.",
   norows: "Aucune ligne valide trouvée dans le fichier.",
+};
+
+// Erreurs « une ligne incomplète rejette tout le fichier » : champ manquant
+// par clé d'erreur.
+const LINE_ERROR_FIELDS: Record<string, string> = {
+  missingref: "référence TecDoc",
+  missingbrand: "marque",
+  missingcat: "catégorie",
 };
 
 export default async function AdminArticlesPage({
@@ -37,10 +45,13 @@ export default async function AdminArticlesPage({
   const skipped = Number(params.skipped ?? 0);
   const hasResult = params.created != null || params.updated != null;
   let errorMessage = params.error ? ERROR_MESSAGES[params.error] ?? null : null;
-  if (params.error === "missingref") {
+  const lineErrorField = params.error
+    ? LINE_ERROR_FIELDS[params.error]
+    : undefined;
+  if (lineErrorField) {
     errorMessage = `${
       params.line ? `Ligne ${params.line} : ` : ""
-    }référence TecDoc manquante. Le fichier entier a été rejeté — aucun article importé.`;
+    }${lineErrorField} manquante. Le fichier entier a été rejeté — aucun article importé.`;
   }
 
   return (
@@ -75,8 +86,12 @@ export default async function AdminArticlesPage({
           </div>
           <ul className="ml-5 list-disc">
             <li>{created} article(s) créé(s)</li>
-            <li>{updated} article(s) mis à jour (désignation)</li>
-            {skipped > 0 && <li>{skipped} ligne(s) ignorée(s) — incomplètes</li>}
+            <li>
+              {updated} article(s) mis à jour (désignation, marque, catégorie)
+            </li>
+            {skipped > 0 && (
+              <li>{skipped} ligne(s) ignorée(s) — désignation manquante</li>
+            )}
           </ul>
         </div>
       )}
@@ -88,7 +103,7 @@ export default async function AdminArticlesPage({
         </h2>
         <p className="text-sm">
           Un fichier <strong>CSV</strong> ou <strong>Excel (.xlsx)</strong> avec
-          une ligne d&apos;en-tête et deux colonnes :
+          une ligne d&apos;en-tête et quatre colonnes :
         </p>
         <div className="overflow-hidden rounded-md border">
           <table className="w-full text-sm">
@@ -96,6 +111,8 @@ export default async function AdminArticlesPage({
               <tr>
                 <th className="px-3 py-2">Référence (TecDoc)</th>
                 <th className="px-3 py-2">Désignation</th>
+                <th className="px-3 py-2">Marque</th>
+                <th className="px-3 py-2">Catégorie</th>
               </tr>
             </thead>
             <tbody>
@@ -104,10 +121,14 @@ export default async function AdminArticlesPage({
                 <td className="px-3 py-2">
                   Jeu de plaquettes de frein avant
                 </td>
+                <td className="px-3 py-2">Bosch</td>
+                <td className="px-3 py-2">Freinage</td>
               </tr>
               <tr className="border-t">
                 <td className="px-3 py-2 font-mono text-xs">0451103316</td>
                 <td className="px-3 py-2">Filtre à huile vissable</td>
+                <td className="px-3 py-2">Valeo</td>
+                <td className="px-3 py-2">Filtration</td>
               </tr>
             </tbody>
           </table>
@@ -115,15 +136,19 @@ export default async function AdminArticlesPage({
         <ul className="ml-5 list-disc text-xs text-muted-foreground">
           <li>
             Les en-têtes sont reconnus automatiquement (référence / réf /
-            TecDoc, et désignation / libellé / nom).
+            TecDoc, désignation / libellé / nom, marque, catégorie / famille).
           </li>
           <li>
-            La référence TecDoc est obligatoire sur chaque ligne : une seule
-            ligne sans référence fait rejeter le fichier entier.
+            Référence, marque et catégorie sont obligatoires sur chaque ligne :
+            une seule ligne incomplète fait rejeter le fichier entier.
           </li>
           <li>
-            Une référence déjà présente voit sa désignation mise à jour, sans
-            doublon.
+            Les marques et catégories absentes de la base sont créées
+            automatiquement à l&apos;import.
+          </li>
+          <li>
+            Une référence déjà présente voit sa désignation, sa marque et sa
+            catégorie mises à jour, sans doublon.
           </li>
           <li>
             Les articles sont créés sans prix : le coût d&apos;achat se
