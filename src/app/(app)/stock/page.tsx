@@ -14,7 +14,6 @@ import { requireUser } from "@/lib/permissions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
 import { DigitalReadout } from "@/components/dashboard/digital-readout";
 import {
   formatDate,
@@ -27,7 +26,7 @@ import { partsPmpMap } from "@/lib/pmp";
 export default async function StockPage({
   searchParams,
 }: {
-  searchParams: Promise<{ partId?: string; date?: string }>;
+  searchParams: Promise<{ ref?: string; date?: string }>;
 }) {
   await requireUser();
   const params = await searchParams;
@@ -73,11 +72,13 @@ export default async function StockPage({
   // Stock à une date : on reconstitue le stock d'une pièce à une date donnée
   // via le dernier mouvement antérieur (StockMovement.resulting est figé à
   // chaque mouvement). Sans mouvement antérieur, le stock était à 0.
-  const filterPartId = params.partId?.trim() || null;
+  const filterRef = params.ref?.trim() || null;
   const today = new Date().toISOString().slice(0, 10);
   const filterDate = params.date?.trim() || today;
-  const filterPart = filterPartId
-    ? parts.find((p) => p.id === filterPartId) ?? null
+  const filterPart = filterRef
+    ? parts.find(
+        (p) => p.reference.toLowerCase() === filterRef.toLowerCase(),
+      ) ?? null
     : null;
   let stockAtDate: number | null = null;
   if (filterPart) {
@@ -142,20 +143,29 @@ export default async function StockPage({
             className="flex flex-wrap items-end gap-2 rounded-lg border bg-card p-4"
           >
             <div className="flex-1 space-y-1">
-              <label
-                htmlFor="partId"
-                className="text-xs text-muted-foreground"
-              >
-                Article
+              <label htmlFor="ref" className="text-xs text-muted-foreground">
+                Référence article
               </label>
-              <Select id="partId" name="partId" defaultValue={filterPartId ?? ""}>
-                <option value="">— Choisir un article —</option>
+              <Input
+                id="ref"
+                name="ref"
+                list="stock-part-refs"
+                defaultValue={filterRef ?? ""}
+                placeholder="Saisir une référence…"
+                autoComplete="off"
+              />
+              <datalist id="stock-part-refs">
                 {parts.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.reference} — {p.name}
+                  <option key={p.id} value={p.reference}>
+                    {p.name}
                   </option>
                 ))}
-              </Select>
+              </datalist>
+              {filterRef && !filterPart && (
+                <p className="text-xs text-destructive">
+                  Référence introuvable.
+                </p>
+              )}
             </div>
             <div className="space-y-1">
               <label htmlFor="date" className="text-xs text-muted-foreground">
