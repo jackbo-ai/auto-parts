@@ -31,7 +31,7 @@ export default async function PartsPage({
     where.OR = [
       { reference: { contains: q } },
       { name: { contains: q } },
-      { brand: { contains: q } },
+      { brand: { name: { contains: q } } },
     ];
   }
   if (params.categoryId) where.categoryId = params.categoryId;
@@ -41,7 +41,10 @@ export default async function PartsPage({
   const [parts, categories, pmpMap, salePmpMap] = await Promise.all([
     prisma.part.findMany({
       where,
-      include: { category: { select: { name: true } } },
+      include: {
+        category: { select: { name: true } },
+        brand: { select: { name: true } },
+      },
       orderBy: { reference: "asc" },
       take: 300,
     }),
@@ -58,7 +61,10 @@ export default async function PartsPage({
           {canManageCatalog(me.role) && (
             <>
               <Button asChild variant="outline" size="sm">
-                <Link href="/categories">Catégories</Link>
+                <Link href="/admin/categories">Catégories</Link>
+              </Button>
+              <Button asChild variant="outline" size="sm">
+                <Link href="/admin/brands">Marques</Link>
               </Button>
               <Button asChild size="sm">
                 <Link href="/parts/new">
@@ -139,7 +145,7 @@ export default async function PartsPage({
             </div>
             <div className="mt-1 text-sm">{p.name}</div>
             <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-              {p.brand && <span>{p.brand}</span>}
+              {p.brand && <span>{p.brand.name}</span>}
               {p.category && <span>· {p.category.name}</span>}
               {!p.active && (
                 <Badge className="border-slate-300 bg-slate-200 text-slate-700">
@@ -209,7 +215,7 @@ export default async function PartsPage({
                   </div>
                   {p.brand && (
                     <div className="text-xs text-muted-foreground">
-                      {p.brand}
+                      {p.brand.name}
                     </div>
                   )}
                 </td>

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Package, Upload, Users } from "lucide-react";
+import { FolderTree, Package, Tag, Upload, Users } from "lucide-react";
 import { Role } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/permissions";
@@ -7,9 +7,11 @@ import { requireRole } from "@/lib/permissions";
 export default async function AdminPage() {
   await requireRole([Role.ADMIN]);
 
-  const [userCount, partCount] = await Promise.all([
+  const [userCount, partCount, categoryCount, brandCount] = await Promise.all([
     prisma.user.count(),
     prisma.part.count(),
+    prisma.category.count(),
+    prisma.brand.count(),
   ]);
 
   const sections = [
@@ -26,6 +28,20 @@ export default async function AdminPage() {
       description: "Import d'un fichier TecDoc (référence + désignation)",
       icon: Upload,
       meta: `${partCount} article${partCount > 1 ? "s" : ""} en base`,
+    },
+    {
+      href: "/admin/categories",
+      label: "Catégories",
+      description: "Arborescence des familles de pièces",
+      icon: FolderTree,
+      meta: `${categoryCount} catégorie${categoryCount > 1 ? "s" : ""}`,
+    },
+    {
+      href: "/admin/brands",
+      label: "Marques",
+      description: "Équipementiers proposés sur la fiche pièce",
+      icon: Tag,
+      meta: `${brandCount} marque${brandCount > 1 ? "s" : ""}`,
     },
   ];
 

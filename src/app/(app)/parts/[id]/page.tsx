@@ -64,6 +64,7 @@ export default async function PartDetailPage({
   const part = await prisma.part.findUnique({
     where: { id },
     include: {
+      brand: { select: { name: true } },
       category: { select: { name: true } },
       supplier: { select: { id: true, name: true } },
       fitments: { orderBy: [{ make: "asc" }, { model: "asc" }] },
@@ -140,7 +141,7 @@ export default async function PartDetailPage({
             )}
             {part.brand && (
               <span className="text-sm text-muted-foreground">
-                {part.brand}
+                {part.brand.name}
               </span>
             )}
           </div>

@@ -49,30 +49,28 @@ async function main() {
     data: { name: "Valeo Distribution", email: "commande@valeo.com" },
   });
 
+  // Marques
+  const boschBrand = await prisma.brand.create({ data: { name: "Bosch" } });
+  const valeoBrand = await prisma.brand.create({ data: { name: "Valeo" } });
+
   // Pièces
   const seedParts: {
     reference: string;
-    oemReference?: string;
     name: string;
-    brand: string;
+    brandId: string;
     categoryId: string;
     supplierId: string;
-    purchasePriceHt: number;
-    salePriceHt: number;
     stockQty: number;
     reorderThreshold: number;
     location: string;
     fitments: { make: string; model: string; engine?: string; yearFrom?: number; yearTo?: number }[];
   }[] = [
     {
-      reference: "AP-PLQ-001",
-      oemReference: "0986494600",
+      reference: "0986494600",
       name: "Jeu de plaquettes de frein avant",
-      brand: "Bosch",
+      brandId: boschBrand.id,
       categoryId: plaquettes.id,
       supplierId: bosch.id,
-      purchasePriceHt: 18.5,
-      salePriceHt: 34.9,
       stockQty: 24,
       reorderThreshold: 8,
       location: "A1-03",
@@ -82,14 +80,11 @@ async function main() {
       ],
     },
     {
-      reference: "AP-DSQ-014",
-      oemReference: "0986479B21",
+      reference: "0986479B21",
       name: "Disque de frein ventilé avant Ø280",
-      brand: "Bosch",
+      brandId: boschBrand.id,
       categoryId: disques.id,
       supplierId: bosch.id,
-      purchasePriceHt: 27.0,
-      salePriceHt: 49.9,
       stockQty: 6,
       reorderThreshold: 10,
       location: "A2-11",
@@ -98,14 +93,11 @@ async function main() {
       ],
     },
     {
-      reference: "AP-FIL-220",
-      oemReference: "0451103316",
+      reference: "0451103316",
       name: "Filtre à huile vissable",
-      brand: "Valeo",
+      brandId: valeoBrand.id,
       categoryId: filtresHuile.id,
       supplierId: valeo.id,
-      purchasePriceHt: 3.2,
-      salePriceHt: 7.5,
       stockQty: 120,
       reorderThreshold: 30,
       location: "B4-02",
@@ -151,9 +143,9 @@ async function main() {
   });
 
   // Commande d'achat réceptionnée → entrée en stock.
-  const plq = partsByRef["AP-PLQ-001"];
-  const dsq = partsByRef["AP-DSQ-014"];
-  const fil = partsByRef["AP-FIL-220"];
+  const plq = partsByRef["0986494600"];
+  const dsq = partsByRef["0986479B21"];
+  const fil = partsByRef["0451103316"];
 
   const purchase = await prisma.purchaseOrder.create({
     data: {

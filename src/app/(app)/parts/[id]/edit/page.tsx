@@ -15,10 +15,11 @@ export default async function EditPartPage({
   await requireRole([Role.ADMIN, Role.MANAGER]);
   const { id } = await params;
 
-  const [part, categories, suppliers] = await Promise.all([
+  const [part, categories, suppliers, brands] = await Promise.all([
     prisma.part.findUnique({ where: { id } }),
     prisma.category.findMany({ orderBy: { name: "asc" } }),
     prisma.supplier.findMany({ orderBy: { name: "asc" } }),
+    prisma.brand.findMany({ orderBy: { name: "asc" } }),
   ]);
   if (!part) notFound();
 
@@ -36,6 +37,7 @@ export default async function EditPartPage({
         action={updatePart}
         categories={categories}
         suppliers={suppliers}
+        brands={brands}
         part={part}
       />
     </div>

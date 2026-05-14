@@ -43,7 +43,7 @@ export async function createCategory(formData: FormData) {
   await prisma.category.create({
     data: { name, slug: await uniqueSlug(name), parentId: parentId ?? null },
   });
-  revalidatePath("/categories");
+  revalidatePath("/admin/categories");
 }
 
 export async function updateCategory(formData: FormData) {
@@ -68,7 +68,7 @@ export async function updateCategory(formData: FormData) {
       parentId: parentId ?? null,
     },
   });
-  revalidatePath("/categories");
+  revalidatePath("/admin/categories");
 }
 
 export async function deleteCategory(formData: FormData) {
@@ -92,5 +92,5 @@ export async function deleteCategory(formData: FormData) {
   }
 
   await prisma.category.delete({ where: { id } });
-  revalidatePath("/categories");
+  revalidatePath("/admin/categories");
 }

@@ -9,9 +9,10 @@ import { createPart } from "../actions";
 export default async function NewPartPage() {
   await requireRole([Role.ADMIN, Role.MANAGER]);
 
-  const [categories, suppliers] = await Promise.all([
+  const [categories, suppliers, brands] = await Promise.all([
     prisma.category.findMany({ orderBy: { name: "asc" } }),
     prisma.supplier.findMany({ orderBy: { name: "asc" } }),
+    prisma.brand.findMany({ orderBy: { name: "asc" } }),
   ]);
 
   return (
@@ -28,6 +29,7 @@ export default async function NewPartPage() {
         action={createPart}
         categories={categories}
         suppliers={suppliers}
+        brands={brands}
       />
     </div>
   );

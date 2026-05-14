@@ -11,7 +11,7 @@ type PartValues = {
   reference: string;
   name: string;
   description: string | null;
-  brand: string | null;
+  brandId: string | null;
   categoryId: string | null;
   supplierId: string | null;
   vatRate: number;
@@ -46,11 +46,13 @@ export function PartForm({
   action,
   categories,
   suppliers,
+  brands,
   part,
 }: {
   action: (formData: FormData) => void;
   categories: Option[];
   suppliers: Option[];
+  brands: Option[];
   part?: PartValues;
 }) {
   const isEdit = !!part;
@@ -91,13 +93,19 @@ export function PartForm({
               placeholder="Jeu de plaquettes de frein avant"
             />
           </Field>
-          <Field label="Marque" htmlFor="brand">
-            <Input
-              id="brand"
-              name="brand"
-              defaultValue={part?.brand ?? ""}
-              placeholder="Bosch"
-            />
+          <Field label="Marque" htmlFor="brandId">
+            <Select
+              id="brandId"
+              name="brandId"
+              defaultValue={part?.brandId ?? ""}
+            >
+              <option value="">— Aucune —</option>
+              {brands.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}
+                </option>
+              ))}
+            </Select>
           </Field>
           <Field label="Catégorie" htmlFor="categoryId">
             <Select

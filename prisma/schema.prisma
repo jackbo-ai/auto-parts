@@ -43,6 +43,15 @@ model Category {
   createdAt DateTime   @default(now())
 }
 
+// Marques (équipementiers : Bosch, Valeo…). Gérées en admin, choisies sur
+// la fiche pièce via une liste déroulante.
+model Brand {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  parts     Part[]
+}
+
 // Fournisseurs en amont — d'où l'on achète les pièces.
 model Supplier {
   id        String   @id @default(cuid())
@@ -75,8 +84,9 @@ model Part {
   reference   String  @unique // référence TecDoc — identifiant pivot de la pièce
   name        String
   description String?
-  brand       String?
 
+  brandId    String?
+  brand      Brand?    @relation(fields: [brandId], references: [id])
   categoryId String?
   category   Category? @relation(fields: [categoryId], references: [id])
   supplierId String?
