@@ -3,11 +3,13 @@ import {
   AlertTriangle,
   ArrowDownRight,
   ArrowUpRight,
+  Boxes,
   PackageX,
 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/permissions";
 import { Badge } from "@/components/ui/badge";
+import { DigitalReadout } from "@/components/dashboard/digital-readout";
 import { formatDateTime, formatEuro, formatNumber } from "@/lib/utils";
 import { partsPmpMap } from "@/lib/pmp";
 
@@ -57,31 +59,24 @@ export default async function StockPage() {
         </p>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-3">
-        <div className="rounded-lg border bg-card p-4">
-          <div className="text-xs uppercase tracking-wide text-muted-foreground">
-            Pièces en rupture
-          </div>
-          <div className="mt-1 text-2xl font-semibold tabular-nums text-destructive">
-            {formatNumber(outOfStock.length)}
-          </div>
-        </div>
-        <div className="rounded-lg border bg-card p-4">
-          <div className="text-xs uppercase tracking-wide text-muted-foreground">
-            Sous le seuil
-          </div>
-          <div className="mt-1 text-2xl font-semibold tabular-nums text-amber-600">
-            {formatNumber(lowStock.length)}
-          </div>
-        </div>
-        <div className="rounded-lg border bg-card p-4">
-          <div className="text-xs uppercase tracking-wide text-muted-foreground">
-            Références actives
-          </div>
-          <div className="mt-1 text-2xl font-semibold tabular-nums">
-            {formatNumber(parts.length)}
-          </div>
-        </div>
+      <div className="grid gap-4 sm:grid-cols-3">
+        <DigitalReadout
+          label="Pièces en rupture"
+          value={formatNumber(outOfStock.length)}
+          tone={outOfStock.length > 0 ? "danger" : "default"}
+          icon={<PackageX className="h-3.5 w-3.5" />}
+        />
+        <DigitalReadout
+          label="Sous le seuil"
+          value={formatNumber(lowStock.length)}
+          tone={lowStock.length > 0 ? "warning" : "default"}
+          icon={<AlertTriangle className="h-3.5 w-3.5" />}
+        />
+        <DigitalReadout
+          label="Références actives"
+          value={formatNumber(parts.length)}
+          icon={<Boxes className="h-3.5 w-3.5" />}
+        />
       </div>
 
       <section className="space-y-2">
