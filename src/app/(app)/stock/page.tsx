@@ -1,6 +1,7 @@
 import Link from "next/link";
 import {
   AlertTriangle,
+  Archive,
   ArrowDownRight,
   ArrowUpRight,
   Boxes,
@@ -16,29 +17,31 @@ import { partsPmpMap } from "@/lib/pmp";
 export default async function StockPage() {
   await requireUser();
 
-  const [parts, recentMovements, pmpAchatMap] = await Promise.all([
-    prisma.part.findMany({
-      where: { active: true },
-      select: {
-        id: true,
-        reference: true,
-        name: true,
-        stockQty: true,
-        reorderThreshold: true,
-        location: true,
-      },
-      orderBy: { reference: "asc" },
-    }),
-    prisma.stockMovement.findMany({
-      orderBy: { createdAt: "desc" },
-      take: 30,
-      include: {
-        part: { select: { id: true, reference: true, name: true } },
-        createdBy: { select: { name: true } },
-      },
-    }),
-    partsPmpMap(),
-  ]);
+  const [parts, recentMovements, pmpAchatMap, inactiveCount] =
+    await Promise.all([
+      prisma.part.findMany({
+        where: { active: true },
+        select: {
+          id: true,
+          reference: true,
+          name: true,
+          stockQty: true,
+          reorderThreshold: true,
+          location: true,
+        },
+        orderBy: { reference: "asc" },
+      }),
+      prisma.stockMovement.findMany({
+        orderBy: { createdAt: "desc" },
+        take: 30,
+        include: {
+          part: { select: { id: true, reference: true, name: true } },
+          createdBy: { select: { name: true } },
+        },
+      }),
+      partsPmpMap(),
+      prisma.part.count({ where: { active: false } }),
+    ]);
 
   const outOfStock = parts.filter((p) => p.stockQty <= 0);
   const lowStock = parts.filter(
@@ -59,7 +62,7 @@ export default async function StockPage() {
         </p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <DigitalReadout
           label="Pièces en rupture"
           value={formatNumber(outOfStock.length)}
@@ -76,6 +79,11 @@ export default async function StockPage() {
           label="Références actives"
           value={formatNumber(parts.length)}
           icon={<Boxes className="h-3.5 w-3.5" />}
+        />
+        <DigitalReadout
+          label="Pièces inactives"
+          value={formatNumber(inactiveCount)}
+          icon={<Archive className="h-3.5 w-3.5" />}
         />
       </div>
 
