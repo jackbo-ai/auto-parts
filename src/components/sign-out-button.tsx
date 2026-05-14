@@ -10,9 +10,14 @@ export function SignOutButton() {
         await signOut({ redirectTo: "/login" });
       }}
     >
-      <Button type="submit" variant="ghost" size="sm">
+      <Button
+        type="submit"
+        variant="outline"
+        size="sm"
+        className="border-white/30 bg-white/10 text-white hover:bg-white/20 hover:text-white"
+      >
         <LogOut className="h-4 w-4" />
-        Déconnexion
+        <span className="hidden sm:inline">Déconnexion</span>
       </Button>
     </form>
   );

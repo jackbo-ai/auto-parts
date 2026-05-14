@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "AutoParts — Fournisseur de pièces",
+  title: "AutoParts — Back-office fournisseur de pièces",
   description:
-    "Back-office fournisseur de pièces automobiles : catalogue, stock, fournisseurs.",
+    "Back-office fournisseur de pièces automobiles : catalogue, stock, fournisseurs, clients, commandes d'achat et de vente.",
 };
 
 export default function RootLayout({
