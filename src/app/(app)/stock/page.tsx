@@ -43,10 +43,11 @@ export default async function StockPage() {
       prisma.part.count({ where: { active: false } }),
     ]);
 
+  // « À réapprovisionner » = tout ce qui est au niveau du seuil ou en dessous,
+  // ruptures comprises (cohérent avec le tableau de bord). « Ruptures de
+  // stock » est un sous-ensemble urgent mis en avant à part.
   const outOfStock = parts.filter((p) => p.stockQty <= 0);
-  const lowStock = parts.filter(
-    (p) => p.stockQty > 0 && p.stockQty <= p.reorderThreshold,
-  );
+  const lowStock = parts.filter((p) => p.stockQty <= p.reorderThreshold);
   // Valeur du stock au PMP achat (le coût de référence figé n'existe plus).
   const stockValue = parts.reduce(
     (sum, p) => sum + (pmpAchatMap.get(p.id) ?? 0) * p.stockQty,
