@@ -1,0 +1,20 @@
+import type { Metadata } from "next";
+import "./globals.css";
+
+export const metadata: Metadata = {
+  title: "AutoParts — Fournisseur de pièces",
+  description:
+    "Back-office fournisseur de pièces automobiles : catalogue, stock, fournisseurs.",
+};
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="fr" suppressHydrationWarning>
+      <body className="min-h-screen bg-background antialiased">{children}</body>
+    </html>
+  );
+}

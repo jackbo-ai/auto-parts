@@ -1,0 +1,64 @@
+import Link from "next/link";
+import {
+  Boxes,
+  LayoutDashboard,
+  Package,
+  Receipt,
+  ShoppingCart,
+  Truck,
+  Users,
+  Wrench,
+} from "lucide-react";
+import type { SessionUser } from "@/lib/permissions";
+import { ROLE_LABELS, canManageUsers } from "@/lib/permissions";
+import { SignOutButton } from "@/components/sign-out-button";
+
+const NAV = [
+  { href: "/", label: "Tableau de bord", icon: LayoutDashboard },
+  { href: "/parts", label: "Catalogue", icon: Package },
+  { href: "/stock", label: "Stock", icon: Boxes },
+  { href: "/purchase-orders", label: "Achats", icon: ShoppingCart },
+  { href: "/sales-orders", label: "Ventes", icon: Receipt },
+  { href: "/suppliers", label: "Fournisseurs", icon: Truck },
+  { href: "/customers", label: "Clients", icon: Users },
+];
+
+export function Header({ user }: { user: SessionUser }) {
+  const nav = canManageUsers(user.role)
+    ? [...NAV, { href: "/admin/users", label: "Utilisateurs", icon: Wrench }]
+    : NAV;
+
+  return (
+    <header className="border-b bg-card">
+      <div className="container mx-auto flex flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
+        <Link href="/" className="flex items-center gap-2 font-semibold">
+          <span className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground">
+            <Wrench className="h-4 w-4" />
+          </span>
+          AutoParts
+        </Link>
+
+        <nav className="-mx-4 flex flex-1 gap-1 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+          {nav.map(({ href, label, icon: Icon }) => (
+            <Link
+              key={href}
+              href={href}
+              className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+            >
+              <Icon className="h-4 w-4" />
+              {label}
+            </Link>
+          ))}
+        </nav>
+
+        <div className="flex items-center gap-3">
+          <div className="text-right text-xs leading-tight">
+            <div className="font-medium text-foreground">{user.name}</div>
+            <div className="text-muted-foreground">{ROLE_LABELS[user.role]}</div>
+          </div>
+          <SignOutButton />
+        </div>
+      </div>
+    </header>
+  );
+}

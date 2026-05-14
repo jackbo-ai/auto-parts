@@ -1,0 +1,216 @@
+// AutoParts — Prisma schema (Phase 1: socle interne)
+// SQLite, single-file, persisted on Railway via /data volume in production.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN // accès total, gestion des utilisateurs
+  MANAGER // catalogue, stock, fournisseurs, commandes
+  STAFF // saisie de mouvements de stock, lecture
+}
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  name         String
+  passwordHash String
+  role         Role      @default(STAFF)
+  active       Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  lastLoginAt  DateTime?
+
+  stockMovements StockMovement[]
+  purchaseOrders PurchaseOrder[]
+  salesOrders    SalesOrder[]
+}
+
+// Arborescence de catégories (ex. Freinage > Plaquettes).
+model Category {
+  id        String     @id @default(cuid())
+  name      String
+  slug      String     @unique
+  parentId  String?
+  parent    Category?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children  Category[] @relation("CategoryTree")
+  parts     Part[]
+  createdAt DateTime   @default(now())
+}
+
+// Fournisseurs en amont — d'où l'on achète les pièces.
+model Supplier {
+  id        String   @id @default(cuid())
+  name      String
+  email     String?
+  phone     String?
+  address   String?
+  notes     String?
+  createdAt DateTime @default(now())
+
+  parts          Part[]
+  purchaseOrders PurchaseOrder[]
+}
+
+// Clients en aval — à qui l'on vend les pièces.
+model Customer {
+  id        String   @id @default(cuid())
+  name      String
+  email     String?
+  phone     String?
+  address   String?
+  notes     String?
+  createdAt DateTime @default(now())
+
+  salesOrders SalesOrder[]
+}
+
+model Part {
+  id           String  @id @default(cuid())
+  reference    String  @unique // SKU interne
+  oemReference String? // référence constructeur d'origine
+  name         String
+  description  String?
+  brand        String?
+
+  categoryId String?
+  category   Category? @relation(fields: [categoryId], references: [id])
+  supplierId String?
+  supplier   Supplier? @relation(fields: [supplierId], references: [id])
+
+  // Prix en EUR hors taxes. Le prix de vente est obligatoire.
+  purchasePriceHt Float?
+  salePriceHt     Float
+  vatRate         Float @default(0.2)
+
+  // Stock dénormalisé : la quantité de référence vit ici et est mise à jour
+  // dans la même transaction que chaque StockMovement.
+  stockQty         Int     @default(0)
+  reorderThreshold Int     @default(0)
+  location         String? // emplacement entrepôt (allée / étagère)
+
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  fitments      Fitment[]
+  movements     StockMovement[]
+  purchaseLines PurchaseOrderLine[]
+  salesLines    SalesOrderLine[]
+}
+
+// Compatibilité véhicule d'une pièce.
+model Fitment {
+  id       String  @id @default(cuid())
+  partId   String
+  part     Part    @relation(fields: [partId], references: [id], onDelete: Cascade)
+  make     String
+  model    String
+  engine   String?
+  yearFrom Int?
+  yearTo   Int?
+}
+
+enum StockMovementType {
+  IN // entrée (réception fournisseur)
+  OUT // sortie (vente, casse, atelier)
+  ADJUSTMENT // correction d'inventaire
+}
+
+model StockMovement {
+  id        String            @id @default(cuid())
+  partId    String
+  part      Part              @relation(fields: [partId], references: [id], onDelete: Cascade)
+  type      StockMovementType
+  // Quantité signée appliquée au stock (+ pour une entrée, - pour une sortie).
+  quantity  Int
+  // Quantité de stock résultante, figée au moment du mouvement.
+  resulting Int
+  reason    String?
+  createdAt DateTime          @default(now())
+
+  createdById String?
+  createdBy   User?   @relation(fields: [createdById], references: [id])
+}
+
+enum PurchaseOrderStatus {
+  DRAFT // brouillon — lignes encore éditables
+  ORDERED // commande passée au fournisseur
+  RECEIVED // réceptionnée — le stock a été mouvementé
+  CANCELLED // annulée
+}
+
+// Commande d'achat — ce que l'on commande à un fournisseur.
+model PurchaseOrder {
+  id          String              @id @default(cuid())
+  reference   String              @unique // ex. ACH-0001
+  supplierId  String
+  supplier    Supplier            @relation(fields: [supplierId], references: [id])
+  status      PurchaseOrderStatus @default(DRAFT)
+  orderDate   DateTime            @default(now())
+  expectedAt  DateTime?
+  receivedAt  DateTime?
+  notes       String?
+  createdById String?
+  createdBy   User?               @relation(fields: [createdById], references: [id])
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  lines PurchaseOrderLine[]
+}
+
+model PurchaseOrderLine {
+  id              String        @id @default(cuid())
+  purchaseOrderId String
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  partId          String
+  part            Part          @relation(fields: [partId], references: [id])
+  quantity        Int
+  unitPriceHt     Float // prix d'achat unitaire négocié pour cette commande
+  vatRate         Float         @default(0.2)
+}
+
+enum SalesOrderStatus {
+  DRAFT // brouillon — lignes encore éditables
+  CONFIRMED // commande client confirmée
+  DELIVERED // livrée — le stock a été mouvementé
+  INVOICED // facturée
+  CANCELLED // annulée
+}
+
+// Commande client — ce qu'un client nous commande.
+model SalesOrder {
+  id          String           @id @default(cuid())
+  reference   String           @unique // ex. VTE-0001
+  customerId  String
+  customer    Customer         @relation(fields: [customerId], references: [id])
+  status      SalesOrderStatus @default(DRAFT)
+  orderDate   DateTime         @default(now())
+  deliveredAt DateTime?
+  invoicedAt  DateTime?
+  notes       String?
+  createdById String?
+  createdBy   User?            @relation(fields: [createdById], references: [id])
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  lines SalesOrderLine[]
+}
+
+model SalesOrderLine {
+  id           String     @id @default(cuid())
+  salesOrderId String
+  salesOrder   SalesOrder @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
+  partId       String
+  part         Part       @relation(fields: [partId], references: [id])
+  quantity     Int
+  unitPriceHt  Float // prix de vente unitaire pour cette commande
+  vatRate      Float      @default(0.2)
+  // Coût d'achat unitaire figé à la livraison, pour le calcul de marge.
+  unitCostHt   Float?
+}

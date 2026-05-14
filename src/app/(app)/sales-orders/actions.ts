@@ -1,0 +1,281 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { z } from "zod";
+import { Role, SalesOrderStatus, StockMovementType } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
+import { requireRole } from "@/lib/permissions";
+import { buildReference } from "@/lib/orders";
+
+const MANAGE_ROLES = [Role.ADMIN, Role.MANAGER];
+
+const optionalText = z
+  .string()
+  .transform((v) => v.trim())
+  .transform((v) => (v === "" ? undefined : v))
+  .optional();
+
+const createSchema = z.object({
+  customerId: z.string().min(1, "Le client est obligatoire"),
+  notes: optionalText,
+});
+
+export async function createSalesOrder(formData: FormData) {
+  const user = await requireRole(MANAGE_ROLES);
+  const parsed = createSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) {
+    throw new Error(parsed.error.issues[0]?.message ?? "Formulaire invalide");
+  }
+
+  const order = await prisma.$transaction(async (tx) => {
+    const count = await tx.salesOrder.count();
+    return tx.salesOrder.create({
+      data: {
+        reference: buildReference("VTE", count),
+        customerId: parsed.data.customerId,
+        notes: parsed.data.notes,
+        createdById: user.id,
+      },
+    });
+  });
+
+  revalidatePath("/sales-orders");
+  redirect(`/sales-orders/${order.id}`);
+}
+
+const lineSchema = z.object({
+  salesOrderId: z.string().min(1),
+  partId: z.string().min(1, "La pièce est obligatoire"),
+  quantity: z
+    .string()
+    .trim()
+    .min(1, "La quantité est obligatoire")
+    .transform((v) => Number(v))
+    .pipe(z.number().int().positive("La quantité doit être positive")),
+  unitPriceHt: z
+    .string()
+    .trim()
+    .min(1, "Le prix unitaire est obligatoire")
+    .transform((v) => Number(v))
+    .pipe(z.number().nonnegative("Le prix doit être positif")),
+  vatRate: z
+    .string()
+    .trim()
+    .transform((v) => (v === "" ? 20 : Number(v)))
+    .pipe(z.number().min(0).max(100)),
+});
+
+export async function addSalesLine(formData: FormData) {
+  await requireRole(MANAGE_ROLES);
+  const parsed = lineSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) {
+    throw new Error(parsed.error.issues[0]?.message ?? "Formulaire invalide");
+  }
+  const { salesOrderId, partId, quantity, unitPriceHt, vatRate } = parsed.data;
+
+  const order = await prisma.salesOrder.findUnique({
+    where: { id: salesOrderId },
+    select: { status: true },
+  });
+  if (!order) throw new Error("Commande introuvable.");
+  if (order.status !== SalesOrderStatus.DRAFT) {
+    throw new Error("Les lignes ne sont modifiables qu'en brouillon.");
+  }
+
+  await prisma.salesOrderLine.create({
+    data: {
+      salesOrderId,
+      partId,
+      quantity,
+      unitPriceHt,
+      vatRate: vatRate / 100,
+    },
+  });
+  revalidatePath(`/sales-orders/${salesOrderId}`);
+}
+
+export async function removeSalesLine(formData: FormData) {
+  await requireRole(MANAGE_ROLES);
+  const id = String(formData.get("id") ?? "");
+  const salesOrderId = String(formData.get("salesOrderId") ?? "");
+  if (!id) throw new Error("Ligne introuvable.");
+
+  const line = await prisma.salesOrderLine.findUnique({
+    where: { id },
+    select: { salesOrder: { select: { status: true } } },
+  });
+  if (!line) throw new Error("Ligne introuvable.");
+  if (line.salesOrder.status !== SalesOrderStatus.DRAFT) {
+    throw new Error("Les lignes ne sont modifiables qu'en brouillon.");
+  }
+
+  await prisma.salesOrderLine.delete({ where: { id } });
+  if (salesOrderId) revalidatePath(`/sales-orders/${salesOrderId}`);
+}
+
+export async function markSalesConfirmed(formData: FormData) {
+  await requireRole(MANAGE_ROLES);
+  const id = String(formData.get("id") ?? "");
+  if (!id) throw new Error("Commande introuvable.");
+
+  const order = await prisma.salesOrder.findUnique({
+    where: { id },
+    select: { status: true, _count: { select: { lines: true } } },
+  });
+  if (!order) throw new Error("Commande introuvable.");
+  if (order.status !== SalesOrderStatus.DRAFT) {
+    throw new Error("Seul un brouillon peut être confirmé.");
+  }
+  if (order._count.lines === 0) {
+    throw new Error("Ajoutez au moins une ligne avant de confirmer.");
+  }
+
+  await prisma.salesOrder.update({
+    where: { id },
+    data: { status: SalesOrderStatus.CONFIRMED },
+  });
+  revalidatePath("/sales-orders");
+  revalidatePath(`/sales-orders/${id}`);
+}
+
+// Livraison : passe la commande en DELIVERED, crée un mouvement de sortie par
+// ligne et fige le coût d'achat unitaire (pour le calcul de marge), le tout
+// dans la même transaction. Échoue si le stock est insuffisant.
+export async function deliverSalesOrder(formData: FormData) {
+  const user = await requireRole(MANAGE_ROLES);
+  const id = String(formData.get("id") ?? "");
+  if (!id) throw new Error("Commande introuvable.");
+
+  await prisma.$transaction(async (tx) => {
+    const order = await tx.salesOrder.findUnique({
+      where: { id },
+      include: { lines: true },
+    });
+    if (!order) throw new Error("Commande introuvable.");
+    if (order.status !== SalesOrderStatus.CONFIRMED) {
+      throw new Error("Seule une commande confirmée peut être livrée.");
+    }
+
+    for (const line of order.lines) {
+      const part = await tx.part.findUnique({
+        where: { id: line.partId },
+        select: { reference: true, stockQty: true, purchasePriceHt: true },
+      });
+      if (!part) throw new Error("Pièce introuvable sur une ligne.");
+
+      const resulting = part.stockQty - line.quantity;
+      if (resulting < 0) {
+        throw new Error(
+          `Stock insuffisant pour ${part.reference} : ${part.stockQty} en stock, ${line.quantity} demandé(s).`,
+        );
+      }
+
+      await tx.stockMovement.create({
+        data: {
+          partId: line.partId,
+          type: StockMovementType.OUT,
+          quantity: -line.quantity,
+          resulting,
+          reason: `Livraison vente ${order.reference}`,
+          createdById: user.id,
+        },
+      });
+      await tx.part.update({
+        where: { id: line.partId },
+        data: { stockQty: resulting },
+      });
+      // Fige le coût d'achat unitaire au moment de la livraison.
+      await tx.salesOrderLine.update({
+        where: { id: line.id },
+        data: { unitCostHt: part.purchasePriceHt },
+      });
+    }
+
+    await tx.salesOrder.update({
+      where: { id },
+      data: {
+        status: SalesOrderStatus.DELIVERED,
+        deliveredAt: new Date(),
+      },
+    });
+  });
+
+  revalidatePath("/sales-orders");
+  revalidatePath(`/sales-orders/${id}`);
+  revalidatePath("/stock");
+  revalidatePath("/");
+}
+
+export async function invoiceSalesOrder(formData: FormData) {
+  await requireRole(MANAGE_ROLES);
+  const id = String(formData.get("id") ?? "");
+  if (!id) throw new Error("Commande introuvable.");
+
+  const order = await prisma.salesOrder.findUnique({
+    where: { id },
+    select: { status: true },
+  });
+  if (!order) throw new Error("Commande introuvable.");
+  if (order.status !== SalesOrderStatus.DELIVERED) {
+    throw new Error("Seule une commande livrée peut être facturée.");
+  }
+
+  await prisma.salesOrder.update({
+    where: { id },
+    data: { status: SalesOrderStatus.INVOICED, invoicedAt: new Date() },
+  });
+  revalidatePath("/sales-orders");
+  revalidatePath(`/sales-orders/${id}`);
+  revalidatePath("/");
+}
+
+export async function cancelSalesOrder(formData: FormData) {
+  await requireRole(MANAGE_ROLES);
+  const id = String(formData.get("id") ?? "");
+  if (!id) throw new Error("Commande introuvable.");
+
+  const order = await prisma.salesOrder.findUnique({
+    where: { id },
+    select: { status: true },
+  });
+  if (!order) throw new Error("Commande introuvable.");
+  if (
+    order.status !== SalesOrderStatus.DRAFT &&
+    order.status !== SalesOrderStatus.CONFIRMED
+  ) {
+    throw new Error("Cette commande ne peut plus être annulée.");
+  }
+
+  await prisma.salesOrder.update({
+    where: { id },
+    data: { status: SalesOrderStatus.CANCELLED },
+  });
+  revalidatePath("/sales-orders");
+  revalidatePath(`/sales-orders/${id}`);
+}
+
+export async function deleteSalesOrder(formData: FormData) {
+  await requireRole(MANAGE_ROLES);
+  const id = String(formData.get("id") ?? "");
+  if (!id) throw new Error("Commande introuvable.");
+
+  const order = await prisma.salesOrder.findUnique({
+    where: { id },
+    select: { status: true },
+  });
+  if (!order) throw new Error("Commande introuvable.");
+  if (
+    order.status === SalesOrderStatus.DELIVERED ||
+    order.status === SalesOrderStatus.INVOICED
+  ) {
+    throw new Error(
+      "Une commande livrée ou facturée ne peut pas être supprimée (le stock a déjà été mouvementé).",
+    );
+  }
+
+  // Les lignes sont supprimées en cascade (voir schema).
+  await prisma.salesOrder.delete({ where: { id } });
+  revalidatePath("/sales-orders");
+  redirect("/sales-orders");
+}
