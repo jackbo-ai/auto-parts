@@ -10,8 +10,13 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { createPurchaseOrder } from "../actions";
 
-export default async function NewPurchaseOrderPage() {
+export default async function NewPurchaseOrderPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>;
+}) {
   await requireRole([Role.ADMIN, Role.MANAGER]);
+  const { error } = await searchParams;
 
   const suppliers = await prisma.supplier.findMany({
     orderBy: { name: "asc" },
@@ -27,6 +32,12 @@ export default async function NewPurchaseOrderPage() {
         Retour aux commandes d&apos;achat
       </Link>
       <h1 className="text-2xl font-semibold">Nouvelle commande d&apos;achat</h1>
+
+      {error && (
+        <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          {error}
+        </p>
+      )}
 
       {suppliers.length === 0 ? (
         <div className="rounded-lg border bg-card px-4 py-8 text-center text-sm text-muted-foreground">

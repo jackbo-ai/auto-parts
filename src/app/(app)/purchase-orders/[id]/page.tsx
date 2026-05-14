@@ -22,11 +22,14 @@ import {
 
 export default async function PurchaseOrderDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ error?: string }>;
 }) {
   const me = await requireUser();
   const { id } = await params;
+  const { error } = await searchParams;
   const canManage = canManageOrders(me.role);
 
   const order = await prisma.purchaseOrder.findUnique({
@@ -86,6 +89,12 @@ export default async function PurchaseOrderDetailPage({
           {PURCHASE_STATUS_LABELS[order.status]}
         </Badge>
       </div>
+
+      {error && (
+        <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          {error}
+        </p>
+      )}
 
       <section className="grid gap-3 rounded-lg border bg-card p-4 text-sm sm:grid-cols-3">
         <div>
