@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { Plus } from "lucide-react";
+import type { Prisma } from "@prisma/client";
+import { PurchaseOrderStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireUser, canManageOrders } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
@@ -7,6 +9,62 @@ import { Badge } from "@/components/ui/badge";
 import { formatDate, formatEuro } from "@/lib/utils";
 import { orderTotals } from "@/lib/totals";
 import { PURCHASE_STATUS_BADGE, PURCHASE_STATUS_LABELS } from "@/lib/orders";
+
+type PurchaseOrderRow = Prisma.PurchaseOrderGetPayload<{
+  include: { supplier: { select: { name: true } }; lines: true };
+}>;
+
+function OrdersTable({ orders }: { orders: PurchaseOrderRow[] }) {
+  return (
+    <div className="overflow-hidden rounded-lg border bg-card">
+      <table className="w-full text-sm">
+        <thead className="border-b bg-muted/60 text-left text-xs uppercase text-muted-foreground">
+          <tr>
+            <th className="px-4 py-3">Référence</th>
+            <th className="px-4 py-3">Fournisseur</th>
+            <th className="px-4 py-3">Date</th>
+            <th className="px-4 py-3">Lignes</th>
+            <th className="px-4 py-3 text-right">Total TTC</th>
+            <th className="px-4 py-3">Statut</th>
+          </tr>
+        </thead>
+        <tbody>
+          {orders.map((o) => {
+            const totals = orderTotals(o.lines);
+            return (
+              <tr
+                key={o.id}
+                className="border-b last:border-0 hover:bg-accent/40"
+              >
+                <td className="px-4 py-3">
+                  <Link
+                    href={`/purchase-orders/${o.id}`}
+                    className="font-mono text-xs text-primary hover:underline"
+                  >
+                    {o.reference}
+                  </Link>
+                </td>
+                <td className="px-4 py-3">{o.supplier.name}</td>
+                <td className="px-4 py-3 text-muted-foreground">
+                  {formatDate(o.orderDate)}
+                </td>
+                <td className="px-4 py-3 tabular-nums">{o.lines.length}</td>
+                <td className="px-4 py-3 text-right tabular-nums">
+                  {formatEuro(totals.ttc)}
+                </td>
+                <td className="px-4 py-3">
+                  <Badge className={PURCHASE_STATUS_BADGE[o.status]}>
+                    {PURCHASE_STATUS_LABELS[o.status]}
+                  </Badge>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
 
 export default async function PurchaseOrdersPage() {
   const me = await requireUser();
@@ -19,6 +77,13 @@ export default async function PurchaseOrdersPage() {
       lines: true,
     },
   });
+
+  const activeOrders = orders.filter(
+    (o) => o.status !== PurchaseOrderStatus.CANCELLED,
+  );
+  const cancelledOrders = orders.filter(
+    (o) => o.status === PurchaseOrderStatus.CANCELLED,
+  );
 
   return (
     <div className="space-y-5">
@@ -40,53 +105,16 @@ export default async function PurchaseOrdersPage() {
         </div>
       )}
 
-      <div className="overflow-hidden rounded-lg border bg-card">
-        <table className="w-full text-sm">
-          <thead className="border-b bg-muted/60 text-left text-xs uppercase text-muted-foreground">
-            <tr>
-              <th className="px-4 py-3">Référence</th>
-              <th className="px-4 py-3">Fournisseur</th>
-              <th className="px-4 py-3">Date</th>
-              <th className="px-4 py-3">Lignes</th>
-              <th className="px-4 py-3 text-right">Total TTC</th>
-              <th className="px-4 py-3">Statut</th>
-            </tr>
-          </thead>
-          <tbody>
-            {orders.map((o) => {
-              const totals = orderTotals(o.lines);
-              return (
-                <tr
-                  key={o.id}
-                  className="border-b last:border-0 hover:bg-accent/40"
-                >
-                  <td className="px-4 py-3">
-                    <Link
-                      href={`/purchase-orders/${o.id}`}
-                      className="font-mono text-xs text-primary hover:underline"
-                    >
-                      {o.reference}
-                    </Link>
-                  </td>
-                  <td className="px-4 py-3">{o.supplier.name}</td>
-                  <td className="px-4 py-3 text-muted-foreground">
-                    {formatDate(o.orderDate)}
-                  </td>
-                  <td className="px-4 py-3 tabular-nums">{o.lines.length}</td>
-                  <td className="px-4 py-3 text-right tabular-nums">
-                    {formatEuro(totals.ttc)}
-                  </td>
-                  <td className="px-4 py-3">
-                    <Badge className={PURCHASE_STATUS_BADGE[o.status]}>
-                      {PURCHASE_STATUS_LABELS[o.status]}
-                    </Badge>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+      {activeOrders.length > 0 && <OrdersTable orders={activeOrders} />}
+
+      {cancelledOrders.length > 0 && (
+        <section className="space-y-2">
+          <h2 className="text-sm font-medium text-muted-foreground">
+            Commandes annulées ({cancelledOrders.length})
+          </h2>
+          <OrdersTable orders={cancelledOrders} />
+        </section>
+      )}
     </div>
   );
 }
