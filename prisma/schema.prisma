@@ -71,12 +71,11 @@ model Customer {
 }
 
 model Part {
-  id           String  @id @default(cuid())
-  reference    String  @unique // SKU interne
-  oemReference String? // référence constructeur d'origine
-  name         String
-  description  String?
-  brand        String?
+  id          String  @id @default(cuid())
+  reference   String  @unique // référence TecDoc — identifiant pivot de la pièce
+  name        String
+  description String?
+  brand       String?
 
   categoryId String?
   category   Category? @relation(fields: [categoryId], references: [id])

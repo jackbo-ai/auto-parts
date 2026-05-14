@@ -30,7 +30,6 @@ export default async function PartsPage({
   if (q) {
     where.OR = [
       { reference: { contains: q } },
-      { oemReference: { contains: q } },
       { name: { contains: q } },
       { brand: { contains: q } },
     ];
@@ -133,11 +132,6 @@ export default async function PartsPage({
                 <div className="font-mono text-sm font-bold text-primary">
                   {p.reference}
                 </div>
-                {p.oemReference && (
-                  <div className="font-mono text-xs text-muted-foreground">
-                    OEM {p.oemReference}
-                  </div>
-                )}
               </div>
               <Badge className={stockBadge(p.stockQty, p.reorderThreshold)}>
                 {formatNumber(p.stockQty)} en stock
@@ -203,11 +197,6 @@ export default async function PartsPage({
                   >
                     {p.reference}
                   </Link>
-                  {p.oemReference && (
-                    <div className="font-mono text-xs text-muted-foreground">
-                      OEM {p.oemReference}
-                    </div>
-                  )}
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-2">

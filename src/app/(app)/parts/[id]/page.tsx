@@ -186,13 +186,6 @@ export default async function PartDetailPage({
               Informations
             </h2>
             <dl className="divide-y">
-              <InfoRow label="Référence OEM">
-                {part.oemReference ? (
-                  <span className="font-mono">{part.oemReference}</span>
-                ) : (
-                  "—"
-                )}
-              </InfoRow>
               <InfoRow label="Catégorie">
                 {part.category?.name ?? "—"}
               </InfoRow>

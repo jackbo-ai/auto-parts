@@ -9,7 +9,6 @@ type Option = { id: string; name: string };
 type PartValues = {
   id?: string;
   reference: string;
-  oemReference: string | null;
   name: string;
   description: string | null;
   brand: string | null;
@@ -65,20 +64,17 @@ export function PartForm({
           Identification
         </h2>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Référence interne (SKU)" htmlFor="reference">
+          <Field
+            label="Référence TecDoc"
+            htmlFor="reference"
+            className="sm:col-span-2"
+            hint="Identifiant pivot de la pièce."
+          >
             <Input
               id="reference"
               name="reference"
               required
               defaultValue={part?.reference ?? ""}
-              placeholder="AP-PLQ-001"
-            />
-          </Field>
-          <Field label="Référence OEM" htmlFor="oemReference">
-            <Input
-              id="oemReference"
-              name="oemReference"
-              defaultValue={part?.oemReference ?? ""}
               placeholder="0986494600"
             />
           </Field>

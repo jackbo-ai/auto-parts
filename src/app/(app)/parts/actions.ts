@@ -23,7 +23,6 @@ const optionalNumber = z
 
 const partSchema = z.object({
   reference: z.string().trim().min(1, "La référence est obligatoire"),
-  oemReference: optionalText.optional(),
   name: z.string().trim().min(1, "La désignation est obligatoire"),
   description: optionalText.optional(),
   brand: optionalText.optional(),
@@ -62,7 +61,6 @@ export async function createPart(formData: FormData) {
   const part = await prisma.part.create({
     data: {
       reference: data.reference,
-      oemReference: data.oemReference,
       name: data.name,
       description: data.description,
       brand: data.brand,
@@ -113,7 +111,6 @@ export async function updatePart(formData: FormData) {
     where: { id },
     data: {
       reference: data.reference,
-      oemReference: data.oemReference,
       name: data.name,
       description: data.description,
       brand: data.brand,
