@@ -47,7 +47,7 @@ export default async function LoginPage({
         className="pointer-events-none absolute inset-0 opacity-60"
         style={{
           background:
-            "radial-gradient(800px 400px at 50% -10%, rgba(94,234,212,0.25), transparent 70%)",
+            "radial-gradient(800px 400px at 50% -10%, rgba(252,165,165,0.30), transparent 70%)",
         }}
       />
       <Card className="relative w-full max-w-sm border-white/30 bg-white/95 shadow-2xl backdrop-blur">

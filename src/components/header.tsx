@@ -39,7 +39,7 @@ export function Header({ user }: { user: SessionUser }) {
           <BrandMark className="h-9 w-9" />
           <span className="hidden flex-col leading-tight sm:flex">
             <span className="text-base">AutoParts</span>
-            <span className="text-[10px] uppercase tracking-[0.18em] text-teal-200">
+            <span className="text-[10px] uppercase tracking-[0.18em] text-red-200">
               Back-office fournisseur de pièces
             </span>
           </span>
@@ -50,7 +50,7 @@ export function Header({ user }: { user: SessionUser }) {
             <div className="font-medium text-white">
               {user.name || user.email}
             </div>
-            <div className="text-teal-200">{ROLE_LABELS[user.role]}</div>
+            <div className="text-red-200">{ROLE_LABELS[user.role]}</div>
           </div>
           <SignOutButton />
         </div>

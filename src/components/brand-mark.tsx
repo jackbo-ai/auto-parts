@@ -20,8 +20,8 @@ export function BrandMark({
       <title>{title}</title>
       <defs>
         <linearGradient id="ap-bg" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="#0B1F3A" />
-          <stop offset="100%" stopColor="#0F766E" />
+          <stop offset="0%" stopColor="#5B0F12" />
+          <stop offset="100%" stopColor="#DC2626" />
         </linearGradient>
       </defs>
       <rect
@@ -35,7 +35,7 @@ export function BrandMark({
         strokeWidth="1"
       />
       {/* Pignon — dents */}
-      <g fill="#5EEAD4">
+      <g fill="#FECACA">
         <rect x="22" y="7" width="4" height="6" rx="1" />
         <rect x="22" y="35" width="4" height="6" rx="1" />
         <rect x="35" y="22" width="6" height="4" rx="1" />
@@ -74,8 +74,8 @@ export function BrandMark({
         />
       </g>
       {/* Corps du pignon */}
-      <circle cx="24" cy="24" r="11" fill="#5EEAD4" />
-      <circle cx="24" cy="24" r="7.5" fill="#0B1F3A" />
+      <circle cx="24" cy="24" r="11" fill="#FECACA" />
+      <circle cx="24" cy="24" r="7.5" fill="#5B0F12" />
       {/* Moyeu central */}
       <circle cx="24" cy="24" r="3" fill="#FFFFFF" />
     </svg>

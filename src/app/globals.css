@@ -4,35 +4,34 @@
 
 @layer base {
   :root {
-    /* AutoParts — palette auto-tech (navy nuit + turquoise atelier) */
-    --background: 220 14% 94%;
-    --foreground: 215 35% 12%;
+    /* AutoParts — palette auto-tech (rouge mécanique + gris graphite) */
+    --background: 0 0% 96%;
+    --foreground: 0 12% 12%;
     --card: 0 0% 100%;
-    --card-foreground: 215 35% 12%;
+    --card-foreground: 0 12% 12%;
     --popover: 0 0% 100%;
-    --popover-foreground: 215 35% 12%;
-    /* Navy nuit (#0B1F3A) — fond sombre des CTA et zones de marque */
-    --primary: 215 70% 13%;
+    --popover-foreground: 0 12% 12%;
+    /* Rouge profond (#9B1C1C) — fond des CTA et zones de marque */
+    --primary: 0 68% 36%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 215 70% 13%;
-    --muted: 210 40% 96%;
-    --muted-foreground: 215 18% 42%;
-    /* Turquoise accent (#14B8A6) — surlignages, focus, succès */
-    --accent: 174 77% 91%;
-    --accent-foreground: 175 84% 22%;
-    --destructive: 0 84% 60%;
+    --secondary: 0 30% 96%;
+    --secondary-foreground: 0 68% 36%;
+    --muted: 0 16% 95%;
+    --muted-foreground: 0 6% 42%;
+    /* Rouge clair accent — surlignages, focus, états actifs */
+    --accent: 0 80% 95%;
+    --accent-foreground: 0 70% 35%;
+    --destructive: 0 84% 58%;
     --destructive-foreground: 0 0% 100%;
-    --border: 214 28% 90%;
-    --input: 214 28% 90%;
-    --ring: 175 84% 32%;
+    --border: 0 15% 88%;
+    --input: 0 15% 88%;
+    --ring: 0 72% 45%;
     --radius: 0.625rem;
 
     /* Tokens additionnels propres à AutoParts */
-    --brand-navy: 215 70% 13%;
-    --brand-navy-soft: 215 50% 22%;
-    --brand-teal: 175 84% 32%;
-    --brand-teal-soft: 174 77% 91%;
+    --brand-red: 0 68% 36%;
+    --brand-red-dark: 0 70% 24%;
+    --brand-red-soft: 0 80% 95%;
   }
 }
 
@@ -51,22 +50,22 @@
     background: linear-gradient(
       180deg,
       rgba(255, 255, 255, 0.95) 0%,
-      rgba(245, 250, 255, 0.85) 100%
+      rgba(255, 248, 248, 0.85) 100%
     );
-    border: 1px solid rgba(11, 31, 58, 0.08);
+    border: 1px solid rgba(91, 15, 18, 0.08);
     box-shadow:
       0 1px 0 rgba(255, 255, 255, 0.8) inset,
-      0 4px 20px -8px rgba(11, 31, 58, 0.18);
+      0 4px 20px -8px rgba(91, 15, 18, 0.18);
     backdrop-filter: saturate(140%) blur(2px);
   }
 
-  /* Bandeau hero — dégradé navy → teal (header, écran de connexion) */
+  /* Bandeau hero — dégradé rouge profond (header, écran de connexion) */
   .hero-gradient {
     background: linear-gradient(
       120deg,
-      #0b1f3a 0%,
-      #102b54 45%,
-      #0f766e 100%
+      #5b0f12 0%,
+      #991b1b 45%,
+      #dc2626 100%
     );
   }
 
