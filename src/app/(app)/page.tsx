@@ -16,6 +16,8 @@ import {
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { DigitalReadout } from "@/components/dashboard/digital-readout";
 import { formatDateTime, formatEuro, formatNumber } from "@/lib/utils";
 import { orderTotals } from "@/lib/totals";
 
@@ -109,25 +111,28 @@ export default async function DashboardPage() {
       value: formatNumber(parts.length),
       icon: Package,
       href: "/parts",
+      tone: "default" as const,
     },
     {
       label: "Sous le seuil",
       value: formatNumber(lowStock.length),
       icon: AlertTriangle,
       href: "/stock",
-      alert: lowStock.length > 0,
+      tone: lowStock.length > 0 ? ("danger" as const) : ("default" as const),
     },
     {
       label: "Valeur du stock (achat HT)",
       value: formatEuro(stockValue),
       icon: Boxes,
       href: "/stock",
+      tone: "info" as const,
     },
     {
       label: "Fournisseurs",
       value: formatNumber(suppliersCount),
       icon: Truck,
       href: "/suppliers",
+      tone: "default" as const,
     },
   ];
 
@@ -137,18 +142,21 @@ export default async function DashboardPage() {
       value: formatEuro(caFournisseurTtc),
       icon: ShoppingCart,
       href: "/purchase-orders",
+      tone: "default" as const,
     },
     {
       label: "CA TTC client",
       value: formatEuro(caClientTtc),
       icon: Receipt,
       href: "/sales-orders",
+      tone: "success" as const,
     },
     {
       label: "Marge TTC",
       value: formatEuro(margeTtc),
       icon: Percent,
       href: "/sales-orders",
+      tone: margeTtc < 0 ? ("danger" as const) : ("success" as const),
     },
   ];
 
@@ -162,143 +170,132 @@ export default async function DashboardPage() {
         </p>
       </div>
 
-      <div>
-        <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+      <div className="space-y-2">
+        <h2 className="text-sm font-medium text-muted-foreground">
           Indicateurs financiers
         </h2>
-        <div className="grid gap-3 sm:grid-cols-3">
-          {financialKpis.map(({ label, value, icon: Icon, href }) => (
-            <Link
+        <div className="grid gap-4 sm:grid-cols-3">
+          {financialKpis.map(({ label, value, icon: Icon, href, tone }) => (
+            <DigitalReadout
               key={label}
+              label={label}
+              value={value}
               href={href}
-              className="rounded-lg border bg-card p-4 transition-colors hover:bg-accent/40"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-xs uppercase tracking-wide text-muted-foreground">
-                  {label}
-                </span>
-                <Icon className="h-4 w-4 text-muted-foreground" />
-              </div>
-              <div className="mt-2 text-2xl font-semibold tabular-nums">
-                {value}
-              </div>
-            </Link>
+              tone={tone}
+              icon={<Icon className="h-3.5 w-3.5" />}
+            />
           ))}
         </div>
       </div>
 
-      <div>
-        <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+      <div className="space-y-2">
+        <h2 className="text-sm font-medium text-muted-foreground">
           Catalogue & stock
         </h2>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {operationalKpis.map(({ label, value, icon: Icon, href, alert }) => (
-            <Link
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {operationalKpis.map(({ label, value, icon: Icon, href, tone }) => (
+            <DigitalReadout
               key={label}
+              label={label}
+              value={value}
               href={href}
-              className={`rounded-lg border bg-card p-4 transition-colors hover:bg-accent/40 ${
-                alert ? "border-destructive/40" : ""
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-xs uppercase tracking-wide text-muted-foreground">
-                  {label}
-                </span>
-                <Icon
-                  className={`h-4 w-4 ${
-                    alert ? "text-destructive" : "text-muted-foreground"
-                  }`}
-                />
-              </div>
-              <div
-                className={`mt-2 text-2xl font-semibold tabular-nums ${
-                  alert ? "text-destructive" : ""
-                }`}
-              >
-                {value}
-              </div>
-            </Link>
+              tone={tone}
+              icon={<Icon className="h-3.5 w-3.5" />}
+            />
           ))}
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <section className="space-y-2">
-          <h2 className="flex items-center gap-2 text-base font-medium">
-            <AlertTriangle className="h-4 w-4 text-destructive" />
-            Réapprovisionnement
-          </h2>
-          <div className="space-y-2">
-            {lowStock.length === 0 && (
-              <div className="rounded-lg border bg-card px-4 py-8 text-center text-sm text-muted-foreground">
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <AlertTriangle className="h-4 w-4 text-destructive" />
+              Réapprovisionnement
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {lowStock.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
                 Aucune pièce sous son seuil. Tout est en stock.
-              </div>
+              </p>
+            ) : (
+              <ul className="divide-y">
+                {lowStock.map((p) => (
+                  <li key={p.id} className="py-2.5">
+                    <Link
+                      href={`/parts/${p.id}`}
+                      className="flex items-start justify-between gap-2 hover:bg-accent/40"
+                    >
+                      <div className="min-w-0">
+                        <div className="font-mono text-xs text-muted-foreground">
+                          {p.reference}
+                        </div>
+                        <div className="truncate text-sm">{p.name}</div>
+                      </div>
+                      <Badge className="border-destructive/30 bg-destructive/10 text-destructive">
+                        {p.stockQty} / seuil {p.reorderThreshold}
+                      </Badge>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
             )}
-            {lowStock.map((p) => (
-              <Link
-                key={p.id}
-                href={`/parts/${p.id}`}
-                className="flex items-center justify-between rounded-lg border bg-card p-3 hover:bg-accent/40"
-              >
-                <div className="min-w-0">
-                  <div className="font-mono text-xs text-muted-foreground">
-                    {p.reference}
-                  </div>
-                  <div className="truncate text-sm">{p.name}</div>
-                </div>
-                <Badge className="border-destructive/30 bg-destructive/10 text-destructive">
-                  {p.stockQty} / seuil {p.reorderThreshold}
-                </Badge>
-              </Link>
-            ))}
-          </div>
-        </section>
+          </CardContent>
+        </Card>
 
-        <section className="space-y-2">
-          <h2 className="text-base font-medium">Derniers mouvements de stock</h2>
-          <div className="space-y-2">
-            {recentMovements.length === 0 && (
-              <div className="rounded-lg border bg-card px-4 py-8 text-center text-sm text-muted-foreground">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              Derniers mouvements de stock
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {recentMovements.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
                 Aucun mouvement enregistré.
-              </div>
+              </p>
+            ) : (
+              <ul className="divide-y">
+                {recentMovements.map((m) => {
+                  const isIn = m.quantity >= 0;
+                  return (
+                    <li
+                      key={m.id}
+                      className="flex items-start justify-between gap-2 py-2.5"
+                    >
+                      <div className="min-w-0">
+                        <div className="font-mono text-xs text-muted-foreground">
+                          {m.part.reference}
+                        </div>
+                        <div className="truncate text-sm">{m.part.name}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {formatDateTime(m.createdAt)}
+                          {m.createdBy ? ` · ${m.createdBy.name}` : ""}
+                        </div>
+                      </div>
+                      <Badge
+                        className={
+                          isIn
+                            ? "border-emerald-300 bg-emerald-100 text-emerald-800"
+                            : "border-amber-300 bg-amber-100 text-amber-800"
+                        }
+                      >
+                        {isIn ? (
+                          <ArrowUpRight className="h-3 w-3" />
+                        ) : (
+                          <ArrowDownRight className="h-3 w-3" />
+                        )}
+                        {isIn ? "+" : ""}
+                        {m.quantity}
+                      </Badge>
+                    </li>
+                  );
+                })}
+              </ul>
             )}
-            {recentMovements.map((m) => {
-              const isIn = m.quantity >= 0;
-              return (
-                <div
-                  key={m.id}
-                  className="flex items-center justify-between rounded-lg border bg-card p-3"
-                >
-                  <div className="min-w-0">
-                    <div className="font-mono text-xs text-muted-foreground">
-                      {m.part.reference}
-                    </div>
-                    <div className="truncate text-sm">{m.part.name}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {formatDateTime(m.createdAt)}
-                      {m.createdBy ? ` · ${m.createdBy.name}` : ""}
-                    </div>
-                  </div>
-                  <Badge
-                    className={
-                      isIn
-                        ? "border-emerald-300 bg-emerald-100 text-emerald-800"
-                        : "border-amber-300 bg-amber-100 text-amber-800"
-                    }
-                  >
-                    {isIn ? (
-                      <ArrowUpRight className="h-3 w-3" />
-                    ) : (
-                      <ArrowDownRight className="h-3 w-3" />
-                    )}
-                    {isIn ? "+" : ""}
-                    {m.quantity}
-                  </Badge>
-                </div>
-              );
-            })}
-          </div>
-        </section>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
