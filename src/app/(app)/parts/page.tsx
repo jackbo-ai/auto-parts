@@ -22,14 +22,16 @@ export default async function PartsPage({
 }: {
   searchParams: Promise<{
     q?: string;
-    categoryId?: string;
-    brandId?: string;
+    category?: string;
+    brand?: string;
     status?: string;
   }>;
 }) {
   const me = await requireUser();
   const params = await searchParams;
   const q = params.q?.trim() ?? "";
+  const category = params.category?.trim() ?? "";
+  const brand = params.brand?.trim() ?? "";
 
   const where: Prisma.PartWhereInput = {};
   if (q) {
@@ -39,8 +41,8 @@ export default async function PartsPage({
       { brand: { name: { contains: q } } },
     ];
   }
-  if (params.categoryId) where.categoryId = params.categoryId;
-  if (params.brandId) where.brandId = params.brandId;
+  if (category) where.category = { name: { contains: category } };
+  if (brand) where.brand = { name: { contains: brand } };
   if (params.status === "active") where.active = true;
   if (params.status === "inactive") where.active = false;
 
@@ -108,30 +110,34 @@ export default async function PartsPage({
             ))}
           </datalist>
         </div>
-        <Select
-          name="categoryId"
-          defaultValue={params.categoryId ?? ""}
-          className="max-w-xs"
-        >
-          <option value="">Toutes les catégories</option>
-          {categories.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </Select>
-        <Select
-          name="brandId"
-          defaultValue={params.brandId ?? ""}
-          className="max-w-xs"
-        >
-          <option value="">Toutes les marques</option>
-          {brands.map((b) => (
-            <option key={b.id} value={b.id}>
-              {b.name}
-            </option>
-          ))}
-        </Select>
+        <div className="max-w-[12rem] flex-1">
+          <Input
+            name="category"
+            defaultValue={category}
+            list="parts-categories"
+            autoComplete="off"
+            placeholder="Toutes les catégories"
+          />
+          <datalist id="parts-categories">
+            {categories.map((c) => (
+              <option key={c.id} value={c.name} />
+            ))}
+          </datalist>
+        </div>
+        <div className="max-w-[12rem] flex-1">
+          <Input
+            name="brand"
+            defaultValue={brand}
+            list="parts-brands"
+            autoComplete="off"
+            placeholder="Toutes les marques"
+          />
+          <datalist id="parts-brands">
+            {brands.map((b) => (
+              <option key={b.id} value={b.name} />
+            ))}
+          </datalist>
+        </div>
         <Select
           name="status"
           defaultValue={params.status ?? ""}
@@ -144,7 +150,7 @@ export default async function PartsPage({
         <Button type="submit" variant="secondary" size="sm">
           Filtrer
         </Button>
-        {(q || params.categoryId || params.brandId || params.status) && (
+        {(q || category || brand || params.status) && (
           <Button asChild variant="ghost" size="sm">
             <Link href="/parts">Réinitialiser</Link>
           </Button>
