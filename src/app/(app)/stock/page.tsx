@@ -106,7 +106,7 @@ export default async function StockPage({
         <DigitalReadout
           label="Pièces en rupture"
           value={formatNumber(outOfStock.length)}
-          tone={outOfStock.length > 0 ? "danger" : "default"}
+          tone="danger"
           icon={<PackageX className="h-3.5 w-3.5" />}
         />
         <DigitalReadout
@@ -129,6 +129,7 @@ export default async function StockPage({
         <DigitalReadout
           label="Pièces inactives"
           value={formatNumber(inactiveCount)}
+          tone="danger"
           icon={<Archive className="h-3.5 w-3.5" />}
         />
       </div>
