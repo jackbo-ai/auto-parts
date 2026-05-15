@@ -210,7 +210,7 @@ export default async function DashboardPage() {
       value: dualAmount(caFournisseurTtc, caFournisseurHt),
       icon: ShoppingCart,
       href: "/purchase-orders",
-      tone: "default" as const,
+      tone: "danger" as const,
     },
     {
       label: "CA client",
