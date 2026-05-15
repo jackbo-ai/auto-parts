@@ -140,6 +140,39 @@ export async function partsPmpMap(
   return result;
 }
 
+// PMP d'achat TTC de toutes les pièces — chaque ligne d'achat est pondérée
+// avec sa propre TVA, donc on retombe sur la valeur effectivement payée.
+export async function partsPmpTtcMap(
+  atDate: Date = new Date(),
+): Promise<Map<string, number>> {
+  const lines = await prisma.purchaseOrderLine.findMany({
+    where: { purchaseOrder: { status: PurchaseOrderStatus.RECEIVED } },
+    select: {
+      partId: true,
+      quantity: true,
+      unitPriceHt: true,
+      vatRate: true,
+      purchaseOrder: { select: { orderDate: true } },
+    },
+  });
+  const byPart = new Map<string, PriceEntry[]>();
+  for (const l of lines) {
+    const arr = byPart.get(l.partId) ?? [];
+    arr.push({
+      date: l.purchaseOrder.orderDate,
+      quantity: l.quantity,
+      unitPriceHt: l.unitPriceHt * (1 + l.vatRate),
+    });
+    byPart.set(l.partId, arr);
+  }
+  const result = new Map<string, number>();
+  for (const [partId, entries] of byPart) {
+    const pmp = weightedAveragePrice(entries, atDate);
+    if (pmp !== null) result.set(partId, pmp);
+  }
+  return result;
+}
+
 // PMP de vente de toutes les pièces en une seule requête — pour les listes
 // catalogue.
 export async function partsSalePmpMap(

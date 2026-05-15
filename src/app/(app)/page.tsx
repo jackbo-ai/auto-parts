@@ -8,6 +8,7 @@ import {
   Percent,
   ShoppingCart,
   Receipt,
+  TrendingUp,
   Truck,
 } from "lucide-react";
 import {
@@ -20,7 +21,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DigitalReadout } from "@/components/dashboard/digital-readout";
 import { formatDateTime, formatEuro, formatNumber } from "@/lib/utils";
 import { orderTotals } from "@/lib/totals";
-import { partsPmpMap } from "@/lib/pmp";
+import { partsPmpMap, partsPmpTtcMap } from "@/lib/pmp";
 
 export default async function DashboardPage() {
   const [
@@ -31,6 +32,8 @@ export default async function DashboardPage() {
     receivedPurchases,
     billedSales,
     pmpAchatMap,
+    pmpAchatTtcMap,
+    topSoldGroups,
   ] = await Promise.all([
     prisma.part.findMany({
       where: { active: true },
@@ -74,29 +77,73 @@ export default async function DashboardPage() {
       },
     }),
     partsPmpMap(),
+    partsPmpTtcMap(),
+    prisma.salesOrderLine.groupBy({
+      by: ["partId"],
+      where: {
+        salesOrder: {
+          status: {
+            in: [SalesOrderStatus.DELIVERED, SalesOrderStatus.INVOICED],
+          },
+        },
+      },
+      _sum: { quantity: true },
+      orderBy: { _sum: { quantity: "desc" } },
+      take: 5,
+    }),
   ]);
+
+  const topSoldParts = topSoldGroups.length
+    ? await prisma.part.findMany({
+        where: { id: { in: topSoldGroups.map((g) => g.partId) } },
+        select: { id: true, reference: true, name: true },
+      })
+    : [];
+  const topSoldPartsMap = new Map(topSoldParts.map((p) => [p.id, p]));
+  const topSold = topSoldGroups.flatMap((g) => {
+    const p = topSoldPartsMap.get(g.partId);
+    return p ? [{ ...p, qty: g._sum.quantity ?? 0 }] : [];
+  });
 
   const lowStock = parts.filter((p) => p.stockQty <= p.reorderThreshold);
   // Valeur du stock au PMP achat (le coût de référence figé n'existe plus).
-  const stockValue = parts.reduce(
+  const stockValueHt = parts.reduce(
     (sum, p) => sum + (pmpAchatMap.get(p.id) ?? 0) * p.stockQty,
     0,
   );
+  const stockValueTtc = parts.reduce(
+    (sum, p) => sum + (pmpAchatTtcMap.get(p.id) ?? 0) * p.stockQty,
+    0,
+  );
 
-  // CA TTC fournisseur — somme TTC des lignes des commandes réceptionnées.
+  // CA fournisseur — somme des lignes des commandes réceptionnées.
+  const caFournisseurHt = receivedPurchases.reduce(
+    (sum, o) => sum + orderTotals(o.lines).ht,
+    0,
+  );
   const caFournisseurTtc = receivedPurchases.reduce(
     (sum, o) => sum + orderTotals(o.lines).ttc,
     0,
   );
 
-  // CA TTC client — somme TTC des lignes des commandes livrées/facturées.
+  // CA client — somme des lignes des commandes livrées/facturées.
+  const caClientHt = billedSales.reduce(
+    (sum, o) => sum + orderTotals(o.lines).ht,
+    0,
+  );
   const caClientTtc = billedSales.reduce(
     (sum, o) => sum + orderTotals(o.lines).ttc,
     0,
   );
 
-  // Marge TTC — CA client TTC moins le coût d'achat TTC des pièces vendues
-  // (coût unitaire figé à la livraison sur chaque ligne).
+  // Marge — CA client moins le coût d'achat des pièces vendues (coût unitaire
+  // figé à la livraison sur chaque ligne).
+  const coutVentesHt = billedSales.reduce((sum, o) => {
+    return (
+      sum +
+      o.lines.reduce((s, l) => s + (l.unitCostHt ?? 0) * l.quantity, 0)
+    );
+  }, 0);
   const coutVentesTtc = billedSales.reduce((sum, o) => {
     return (
       sum +
@@ -106,7 +153,25 @@ export default async function DashboardPage() {
       )
     );
   }, 0);
+  const margeHt = Math.round((caClientHt - coutVentesHt) * 100) / 100;
   const margeTtc = Math.round((caClientTtc - coutVentesTtc) * 100) / 100;
+
+  const dualAmount = (ttc: number, ht: number) => (
+    <div className="flex flex-col gap-0.5 leading-tight">
+      <div className="flex items-baseline gap-1.5">
+        <span>{formatEuro(ttc)}</span>
+        <span className="text-[10px] font-normal uppercase tracking-widest opacity-60">
+          TTC
+        </span>
+      </div>
+      <div className="flex items-baseline gap-1.5 text-base opacity-70">
+        <span>{formatEuro(ht)}</span>
+        <span className="text-[10px] font-normal uppercase tracking-widest opacity-60">
+          HT
+        </span>
+      </div>
+    </div>
+  );
 
   const operationalKpis = [
     {
@@ -124,8 +189,8 @@ export default async function DashboardPage() {
       tone: lowStock.length > 0 ? ("danger" as const) : ("default" as const),
     },
     {
-      label: "Valeur du stock (achat HT)",
-      value: formatEuro(stockValue),
+      label: "Valeur du stock (achat)",
+      value: dualAmount(stockValueTtc, stockValueHt),
       icon: Boxes,
       href: "/stock",
       tone: "info" as const,
@@ -141,22 +206,22 @@ export default async function DashboardPage() {
 
   const financialKpis = [
     {
-      label: "CA TTC fournisseur",
-      value: formatEuro(caFournisseurTtc),
+      label: "CA fournisseur",
+      value: dualAmount(caFournisseurTtc, caFournisseurHt),
       icon: ShoppingCart,
       href: "/purchase-orders",
       tone: "default" as const,
     },
     {
-      label: "CA TTC client",
-      value: formatEuro(caClientTtc),
+      label: "CA client",
+      value: dualAmount(caClientTtc, caClientHt),
       icon: Receipt,
       href: "/sales-orders",
       tone: "success" as const,
     },
     {
-      label: "Marge TTC",
-      value: formatEuro(margeTtc),
+      label: "Marge",
+      value: dualAmount(margeTtc, margeHt),
       icon: Percent,
       href: "/sales-orders",
       tone: margeTtc < 0 ? ("danger" as const) : ("success" as const),
@@ -213,18 +278,18 @@ export default async function DashboardPage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
-              <AlertTriangle className="h-4 w-4 text-destructive" />
-              Réapprovisionnement
+              <TrendingUp className="h-4 w-4 text-emerald-600" />
+              Top 5 articles vendus
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {lowStock.length === 0 ? (
+            {topSold.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                Aucune pièce sous son seuil. Tout est en stock.
+                Aucune vente enregistrée.
               </p>
             ) : (
               <ul className="divide-y">
-                {lowStock.map((p) => (
+                {topSold.map((p) => (
                   <li key={p.id} className="py-2.5">
                     <Link
                       href={`/parts/${p.id}`}
@@ -236,8 +301,8 @@ export default async function DashboardPage() {
                         </div>
                         <div className="truncate text-sm">{p.name}</div>
                       </div>
-                      <Badge className="border-destructive/30 bg-destructive/10 text-destructive">
-                        {p.stockQty} / seuil {p.reorderThreshold}
+                      <Badge className="border-emerald-300 bg-emerald-100 text-emerald-800">
+                        {formatNumber(p.qty)} vendus
                       </Badge>
                     </Link>
                   </li>
