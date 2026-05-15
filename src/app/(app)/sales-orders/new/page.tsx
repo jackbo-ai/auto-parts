@@ -14,12 +14,13 @@ export default async function NewSalesOrderPage({
 }: {
   searchParams: Promise<{ error?: string }>;
 }) {
-  await requireRole([Role.ADMIN, Role.MANAGER]);
+  const me = await requireRole([Role.ADMIN, Role.MANAGER]);
   const { error } = await searchParams;
 
   const customers = await prisma.customer.findMany({
     orderBy: { name: "asc" },
   });
+  const isAdmin = me.role === Role.ADMIN;
 
   return (
     <div className="mx-auto max-w-xl space-y-4">
@@ -41,9 +42,16 @@ export default async function NewSalesOrderPage({
       {customers.length === 0 ? (
         <div className="rounded-lg border bg-card px-4 py-8 text-center text-sm text-muted-foreground">
           Aucun client enregistré.{" "}
-          <Link href="/customers" className="text-primary hover:underline">
-            Ajoutez-en un d&apos;abord.
-          </Link>
+          {isAdmin ? (
+            <Link
+              href="/admin/customers"
+              className="text-primary hover:underline"
+            >
+              Ajoutez-en un d&apos;abord.
+            </Link>
+          ) : (
+            <span>Contactez un administrateur pour en ajouter un.</span>
+          )}
         </div>
       ) : (
         <form

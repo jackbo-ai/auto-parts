@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { FolderTree, Package, Tag, Upload, Users } from "lucide-react";
+import { Contact, FolderTree, Package, Tag, Upload, Users } from "lucide-react";
 import { Role } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/permissions";
@@ -7,12 +7,14 @@ import { requireRole } from "@/lib/permissions";
 export default async function AdminPage() {
   await requireRole([Role.ADMIN]);
 
-  const [userCount, partCount, categoryCount, brandCount] = await Promise.all([
-    prisma.user.count(),
-    prisma.part.count(),
-    prisma.category.count(),
-    prisma.brand.count(),
-  ]);
+  const [userCount, partCount, categoryCount, brandCount, customerCount] =
+    await Promise.all([
+      prisma.user.count(),
+      prisma.part.count(),
+      prisma.category.count(),
+      prisma.brand.count(),
+      prisma.customer.count(),
+    ]);
 
   const sections = [
     {
@@ -21,6 +23,13 @@ export default async function AdminPage() {
       description: "Comptes, rôles et accès",
       icon: Users,
       meta: `${userCount} compte${userCount > 1 ? "s" : ""}`,
+    },
+    {
+      href: "/admin/customers",
+      label: "Clients",
+      description: "Fiches clients et historique de commandes",
+      icon: Contact,
+      meta: `${customerCount} client${customerCount > 1 ? "s" : ""}`,
     },
     {
       href: "/admin/articles",

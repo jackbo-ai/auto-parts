@@ -1,15 +1,15 @@
 import Link from "next/link";
 import { Mail, Phone } from "lucide-react";
+import { Role } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { requireUser, canManageOrders } from "@/lib/permissions";
+import { requireRole } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { createCustomer } from "./actions";
 
 export default async function CustomersPage() {
-  const me = await requireUser();
-  const canManage = canManageOrders(me.role);
+  await requireRole([Role.ADMIN]);
 
   const customers = await prisma.customer.findMany({
     orderBy: { name: "asc" },
@@ -20,25 +20,23 @@ export default async function CustomersPage() {
     <div className="space-y-5">
       <h1 className="text-2xl font-semibold">Clients</h1>
 
-      {canManage && (
-        <section className="space-y-2 rounded-lg border bg-card p-4">
-          <h2 className="text-sm font-medium">Ajouter un client</h2>
-          <form action={createCustomer} className="grid gap-2 sm:grid-cols-2">
-            <Input name="name" required placeholder="Nom *" />
-            <Input name="email" type="email" placeholder="Email" />
-            <Input name="phone" placeholder="Téléphone" />
-            <Input name="address" placeholder="Adresse" />
-            <Textarea
-              name="notes"
-              placeholder="Notes (conditions, contact…)"
-              className="sm:col-span-2"
-            />
-            <div className="sm:col-span-2">
-              <Button type="submit">Ajouter</Button>
-            </div>
-          </form>
-        </section>
-      )}
+      <section className="space-y-2 rounded-lg border bg-card p-4">
+        <h2 className="text-sm font-medium">Ajouter un client</h2>
+        <form action={createCustomer} className="grid gap-2 sm:grid-cols-2">
+          <Input name="name" required placeholder="Nom *" />
+          <Input name="email" type="email" placeholder="Email" />
+          <Input name="phone" placeholder="Téléphone" />
+          <Input name="address" placeholder="Adresse" />
+          <Textarea
+            name="notes"
+            placeholder="Notes (conditions, contact…)"
+            className="sm:col-span-2"
+          />
+          <div className="sm:col-span-2">
+            <Button type="submit">Ajouter</Button>
+          </div>
+        </form>
+      </section>
 
       <section className="space-y-2">
         <h2 className="text-sm font-medium">
@@ -53,7 +51,7 @@ export default async function CustomersPage() {
           {customers.map((c) => (
             <Link
               key={c.id}
-              href={`/customers/${c.id}`}
+              href={`/admin/customers/${c.id}`}
               className="rounded-lg border bg-card p-4 hover:bg-accent/40"
             >
               <div className="font-medium">{c.name}</div>

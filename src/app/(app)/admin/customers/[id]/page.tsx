@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
+import { Role } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { requireUser, canManageOrders } from "@/lib/permissions";
+import { requireRole } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,9 +20,8 @@ export default async function CustomerDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const me = await requireUser();
+  await requireRole([Role.ADMIN]);
   const { id } = await params;
-  const canManage = canManageOrders(me.role);
 
   const customer = await prisma.customer.findUnique({
     where: { id },
@@ -37,7 +37,7 @@ export default async function CustomerDetailPage({
   return (
     <div className="mx-auto max-w-3xl space-y-5">
       <Link
-        href="/customers"
+        href="/admin/customers"
         className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft className="h-4 w-4" />
@@ -45,79 +45,66 @@ export default async function CustomerDetailPage({
       </Link>
       <h1 className="text-2xl font-semibold">{customer.name}</h1>
 
-      {canManage ? (
-        <section className="space-y-3 rounded-lg border bg-card p-4">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-            Coordonnées
-          </h2>
-          <form action={updateCustomer} className="space-y-3">
-            <input type="hidden" name="id" value={customer.id} />
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <Label htmlFor="name">Nom</Label>
-                <Input id="name" name="name" defaultValue={customer.name} required />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  name="email"
-                  type="email"
-                  defaultValue={customer.email ?? ""}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="phone">Téléphone</Label>
-                <Input
-                  id="phone"
-                  name="phone"
-                  defaultValue={customer.phone ?? ""}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="address">Adresse</Label>
-                <Input
-                  id="address"
-                  name="address"
-                  defaultValue={customer.address ?? ""}
-                />
-              </div>
+      <section className="space-y-3 rounded-lg border bg-card p-4">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          Coordonnées
+        </h2>
+        <form action={updateCustomer} className="space-y-3">
+          <input type="hidden" name="id" value={customer.id} />
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="name">Nom</Label>
+              <Input id="name" name="name" defaultValue={customer.name} required />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="notes">Notes</Label>
-              <Textarea
-                id="notes"
-                name="notes"
-                defaultValue={customer.notes ?? ""}
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                defaultValue={customer.email ?? ""}
               />
             </div>
-            <div className="flex items-center justify-between">
-              <Button type="submit">Enregistrer</Button>
+            <div className="space-y-1.5">
+              <Label htmlFor="phone">Téléphone</Label>
+              <Input
+                id="phone"
+                name="phone"
+                defaultValue={customer.phone ?? ""}
+              />
             </div>
-          </form>
-          <form action={deleteCustomer} className="border-t pt-3">
-            <input type="hidden" name="id" value={customer.id} />
-            <ConfirmSubmit
-              variant="ghost"
-              size="sm"
-              message={`Supprimer le client "${customer.name}" ?`}
-            >
-              Supprimer le client
-            </ConfirmSubmit>
-          </form>
-        </section>
-      ) : (
-        <section className="space-y-1 rounded-lg border bg-card p-4 text-sm">
-          {customer.email && <div>Email : {customer.email}</div>}
-          {customer.phone && <div>Téléphone : {customer.phone}</div>}
-          {customer.address && <div>Adresse : {customer.address}</div>}
-          {customer.notes && (
-            <div className="whitespace-pre-wrap text-muted-foreground">
-              {customer.notes}
+            <div className="space-y-1.5">
+              <Label htmlFor="address">Adresse</Label>
+              <Input
+                id="address"
+                name="address"
+                defaultValue={customer.address ?? ""}
+              />
             </div>
-          )}
-        </section>
-      )}
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="notes">Notes</Label>
+            <Textarea
+              id="notes"
+              name="notes"
+              defaultValue={customer.notes ?? ""}
+            />
+          </div>
+          <div className="flex items-center justify-between">
+            <Button type="submit">Enregistrer</Button>
+          </div>
+        </form>
+        <form action={deleteCustomer} className="border-t pt-3">
+          <input type="hidden" name="id" value={customer.id} />
+          <ConfirmSubmit
+            variant="ghost"
+            size="sm"
+            message={`Supprimer le client "${customer.name}" ?`}
+          >
+            Supprimer le client
+          </ConfirmSubmit>
+        </form>
+      </section>
 
       <section className="space-y-2">
         <h2 className="text-sm font-medium">

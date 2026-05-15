@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Trash2 } from "lucide-react";
-import { SalesOrderStatus } from "@prisma/client";
+import { Role, SalesOrderStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireUser, canManageOrders } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
@@ -33,6 +33,7 @@ export default async function SalesOrderDetailPage({
   const { id } = await params;
   const { error } = await searchParams;
   const canManage = canManageOrders(me.role);
+  const isAdmin = me.role === Role.ADMIN;
 
   const order = await prisma.salesOrder.findUnique({
     where: { id },
@@ -105,12 +106,16 @@ export default async function SalesOrderDetailPage({
         <div>
           <h1 className="font-mono text-2xl font-semibold">{order.reference}</h1>
           <p className="text-sm text-muted-foreground">
-            <Link
-              href={`/customers/${order.customer.id}`}
-              className="hover:underline"
-            >
-              {order.customer.name}
-            </Link>
+            {isAdmin ? (
+              <Link
+                href={`/admin/customers/${order.customer.id}`}
+                className="hover:underline"
+              >
+                {order.customer.name}
+              </Link>
+            ) : (
+              order.customer.name
+            )}
           </p>
         </div>
         <Badge className={`${SALES_STATUS_BADGE[order.status]} text-sm`}>

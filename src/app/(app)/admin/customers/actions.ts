@@ -7,7 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/permissions";
 import { Role } from "@prisma/client";
 
-const MANAGE_ROLES = [Role.ADMIN, Role.MANAGER];
+const MANAGE_ROLES = [Role.ADMIN];
 
 const optionalText = z
   .string()
@@ -36,7 +36,7 @@ export async function createCustomer(formData: FormData) {
   }
 
   await prisma.customer.create({ data: parsed.data });
-  revalidatePath("/customers");
+  revalidatePath("/admin/customers");
 }
 
 export async function updateCustomer(formData: FormData) {
@@ -58,8 +58,8 @@ export async function updateCustomer(formData: FormData) {
       notes: parsed.data.notes ?? null,
     },
   });
-  revalidatePath("/customers");
-  revalidatePath(`/customers/${id}`);
+  revalidatePath("/admin/customers");
+  revalidatePath(`/admin/customers/${id}`);
 }
 
 export async function deleteCustomer(formData: FormData) {
@@ -77,6 +77,6 @@ export async function deleteCustomer(formData: FormData) {
   }
 
   await prisma.customer.delete({ where: { id } });
-  revalidatePath("/customers");
-  redirect("/customers");
+  revalidatePath("/admin/customers");
+  redirect("/admin/customers");
 }
