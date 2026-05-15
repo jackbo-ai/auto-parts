@@ -7,7 +7,6 @@ import {
   Settings,
   ShoppingCart,
   Truck,
-  Users,
 } from "lucide-react";
 import type { SessionUser } from "@/lib/permissions";
 import { ROLE_LABELS, canManageUsers } from "@/lib/permissions";
@@ -16,12 +15,11 @@ import { SignOutButton } from "@/components/sign-out-button";
 
 const NAV = [
   { href: "/", label: "Tableau de bord", icon: LayoutDashboard },
-  { href: "/parts", label: "Catalogue", icon: Package },
   { href: "/stock", label: "Stock", icon: Boxes },
   { href: "/purchase-orders", label: "Achats", icon: ShoppingCart },
   { href: "/sales-orders", label: "Ventes", icon: Receipt },
   { href: "/suppliers", label: "Fournisseurs", icon: Truck },
-  { href: "/customers", label: "Clients", icon: Users },
+  { href: "/parts", label: "Catalogue", icon: Package },
 ];
 
 export function Header({ user }: { user: SessionUser }) {
