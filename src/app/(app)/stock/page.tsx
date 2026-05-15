@@ -112,7 +112,7 @@ export default async function StockPage({
         <DigitalReadout
           label="Sous le seuil"
           value={formatNumber(lowStock.length)}
-          tone={lowStock.length > 0 ? "warning" : "default"}
+          tone="danger"
           icon={<AlertTriangle className="h-3.5 w-3.5" />}
         />
         <DigitalReadout
