@@ -186,7 +186,7 @@ export default async function DashboardPage() {
       value: formatNumber(lowStock.length),
       icon: AlertTriangle,
       href: "/stock",
-      tone: lowStock.length > 0 ? ("danger" as const) : ("default" as const),
+      tone: "danger" as const,
     },
     {
       label: "Valeur du stock (achat)",
