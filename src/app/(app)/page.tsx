@@ -224,7 +224,7 @@ export default async function DashboardPage() {
       value: dualAmount(margeTtc, margeHt),
       icon: Percent,
       href: "/sales-orders",
-      tone: margeTtc < 0 ? ("danger" as const) : ("success" as const),
+      tone: margeTtc < 0 ? ("danger" as const) : ("info" as const),
     },
   ];
 

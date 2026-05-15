@@ -18,12 +18,12 @@ const RING: Record<Tone, string> = {
   info: "ring-sky-300/40",
 };
 
-// Couleur de la tuile : navy par défaut, orange pour "warning", rouge
-// sombre pour "danger", bleu azur pour "info". red-900 / sky-700 stay
-// readable under the scanlines overlay (lighter shades wash out).
+// Couleur de la tuile : navy par défaut, vert sombre pour "success", orange
+// pour "warning", rouge sombre pour "danger", bleu azur pour "info". Les
+// teintes -900 / sky-700 restent lisibles sous l'overlay scanlines.
 const BG: Record<Tone, string> = {
   default: "bg-[#0B1F3A]",
-  success: "bg-[#0B1F3A]",
+  success: "bg-emerald-900",
   warning: "bg-[#7C3A09]",
   danger: "bg-red-900",
   info: "bg-sky-700",
