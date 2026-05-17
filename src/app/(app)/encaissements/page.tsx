@@ -5,6 +5,7 @@ import {
   Banknote,
   Coins,
   Trash2,
+  Users,
 } from "lucide-react";
 import { SalesOrderStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -30,10 +31,22 @@ import {
   periodBuckets,
 } from "@/lib/period";
 import { orderTotals } from "@/lib/totals";
-import { formatDate, formatDateTime, formatEuro, formatNumber } from "@/lib/utils";
+import { cn, formatDate, formatDateTime, formatEuro, formatNumber } from "@/lib/utils";
 import { createPayment, deletePayment } from "./actions";
 
 const round = (n: number) => Math.round(n * 100) / 100;
+
+type View = "payments" | "clients";
+function parseView(v: string | undefined): View {
+  return v === "clients" ? "clients" : "payments";
+}
+
+function agingBadgeClass(days: number) {
+  if (days <= 30)
+    return "border-emerald-300 bg-emerald-100 text-emerald-800";
+  if (days <= 60) return "border-amber-300 bg-amber-100 text-amber-800";
+  return "border-rose-300 bg-rose-100 text-rose-800";
+}
 
 export default async function EncaissementsPage({
   searchParams,
@@ -44,6 +57,7 @@ export default async function EncaissementsPage({
     to?: string;
     customer?: string;
     category?: string;
+    view?: string;
   }>;
 }) {
   await requireUser();
@@ -53,6 +67,7 @@ export default async function EncaissementsPage({
     to: toParam,
     customer: customerParam,
     category: categoryParam,
+    view: viewParam,
   } = await searchParams;
 
   const range = parsePeriod(rangeParam);
@@ -60,6 +75,20 @@ export default async function EncaissementsPage({
   const periodLabel = describePeriod(range, bounds);
   const customerId = customerParam?.trim() || undefined;
   const categoryId = categoryParam?.trim() || undefined;
+  const view = parseView(viewParam);
+
+  // Lien d'onglet : préserve les autres paramètres de filtre.
+  function tabHref(v: View) {
+    const qs = new URLSearchParams();
+    if (v !== "payments") qs.set("view", v);
+    if (rangeParam) qs.set("range", rangeParam);
+    if (fromParam) qs.set("from", fromParam);
+    if (toParam) qs.set("to", toParam);
+    if (customerId) qs.set("customer", customerId);
+    if (categoryId) qs.set("category", categoryId);
+    const s = qs.toString();
+    return s ? `/encaissements?${s}` : "/encaissements";
+  }
 
   const invoicedAtRange: { gte?: Date; lte?: Date } | undefined =
     bounds.start || bounds.end
@@ -130,6 +159,63 @@ export default async function EncaissementsPage({
     const remainingTtc = round(totals.ttc - paidTtc);
     return { order: o, totals, paidTtc, paidHt, remainingTtc };
   });
+
+  // Agrégation par client pour l'onglet « Encours Client ». On ne garde que les
+  // clients avec au moins une commande non soldée, on calcule l'encours total
+  // et l'âge en jours de l'encours le plus vieux (min invoicedAt parmi les
+  // commandes avec reste > 0).
+  const today = new Date();
+  const todayMs = today.getTime();
+  type ClientGroup = {
+    customerId: string;
+    customerName: string;
+    encoursTtc: number;
+    openCount: number;
+    oldestInvoicedAt: Date;
+    agingDays: number;
+    openOrders: typeof rows;
+  };
+  const clientGroupMap = new Map<string, ClientGroup>();
+  for (const r of rows) {
+    if (r.remainingTtc <= 0.01) continue;
+    const id = r.order.customer.id;
+    let g = clientGroupMap.get(id);
+    if (!g) {
+      g = {
+        customerId: id,
+        customerName: r.order.customer.name,
+        encoursTtc: 0,
+        openCount: 0,
+        oldestInvoicedAt: r.order.invoicedAt ?? today,
+        agingDays: 0,
+        openOrders: [],
+      };
+      clientGroupMap.set(id, g);
+    }
+    g.encoursTtc = round(g.encoursTtc + r.remainingTtc);
+    g.openCount += 1;
+    if (
+      r.order.invoicedAt &&
+      r.order.invoicedAt.getTime() < g.oldestInvoicedAt.getTime()
+    ) {
+      g.oldestInvoicedAt = r.order.invoicedAt;
+    }
+    g.openOrders.push(r);
+  }
+  for (const g of clientGroupMap.values()) {
+    g.agingDays = Math.max(
+      0,
+      Math.floor((todayMs - g.oldestInvoicedAt.getTime()) / 86_400_000),
+    );
+    g.openOrders.sort(
+      (a, b) =>
+        (a.order.invoicedAt?.getTime() ?? 0) -
+        (b.order.invoicedAt?.getTime() ?? 0),
+    );
+  }
+  const clientGroups = Array.from(clientGroupMap.values()).sort(
+    (a, b) => b.agingDays - a.agingDays || b.encoursTtc - a.encoursTtc,
+  );
 
   const kpis = {
     encaisseTtc: round(payments.reduce((s, p) => s + p.amountTtc, 0)),
@@ -254,6 +340,115 @@ export default async function EncaissementsPage({
         <PaymentsChart points={chartPoints} />
       </div>
 
+      <div className="flex items-center gap-1 border-b">
+        {(
+          [
+            { v: "payments", label: "En cours Encaissement", icon: Banknote },
+            { v: "clients", label: "Encours Client", icon: Users },
+          ] as const
+        ).map(({ v, label, icon: Icon }) => {
+          const active = view === v;
+          return (
+            <Link
+              key={v}
+              href={tabHref(v as View)}
+              scroll={false}
+              className={cn(
+                "flex items-center gap-1.5 border-b-2 px-4 py-2 text-sm font-medium transition-colors -mb-px",
+                active
+                  ? "border-primary text-foreground"
+                  : "border-transparent text-muted-foreground hover:text-foreground",
+              )}
+            >
+              <Icon className="h-4 w-4" />
+              {label}
+              {v === "clients" && clientGroups.length > 0 && (
+                <Badge className="ml-1 border-rose-300 bg-rose-100 text-rose-800">
+                  {clientGroups.length}
+                </Badge>
+              )}
+            </Link>
+          );
+        })}
+      </div>
+
+      {view === "clients" ? (
+        <div className="space-y-2">
+          <h2 className="text-sm font-medium text-muted-foreground">
+            Encours par client · trié par ancienneté décroissante
+          </h2>
+          {clientGroups.length === 0 ? (
+            <div className="rounded-lg border bg-card px-4 py-10 text-center text-sm text-muted-foreground">
+              Aucune dette client en cours sur ce périmètre.
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {clientGroups.map((g) => (
+                <details key={g.customerId} className="rounded-lg border bg-card">
+                  <summary className="flex cursor-pointer flex-wrap items-center justify-between gap-3 px-4 py-3 hover:bg-accent/40">
+                    <div className="flex min-w-0 flex-wrap items-center gap-3">
+                      <span className="font-medium">{g.customerName}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {g.openCount} commande{g.openCount > 1 ? "s" : ""} non
+                        soldée{g.openCount > 1 ? "s" : ""}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2 text-sm tabular-nums">
+                      <Badge className="border-slate-300 bg-slate-100 text-slate-800">
+                        Encours {formatEuro(g.encoursTtc)}
+                      </Badge>
+                      <Badge className={agingBadgeClass(g.agingDays)}>
+                        {g.agingDays} j depuis le{" "}
+                        {formatDate(g.oldestInvoicedAt)}
+                      </Badge>
+                    </div>
+                  </summary>
+                  <ul className="divide-y border-t text-sm">
+                    {g.openOrders.map((r) => {
+                      const days = r.order.invoicedAt
+                        ? Math.max(
+                            0,
+                            Math.floor(
+                              (todayMs - r.order.invoicedAt.getTime()) /
+                                86_400_000,
+                            ),
+                          )
+                        : 0;
+                      return (
+                        <li
+                          key={r.order.id}
+                          className="flex flex-wrap items-center justify-between gap-2 px-4 py-2"
+                        >
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Link
+                              href={`/sales-orders/${r.order.id}`}
+                              className="font-mono text-xs font-bold text-primary hover:underline"
+                            >
+                              {r.order.reference}
+                            </Link>
+                            <span className="text-xs text-muted-foreground">
+                              Facturée le {formatDate(r.order.invoicedAt)} ·{" "}
+                              {days} j
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 tabular-nums">
+                            <span className="text-xs text-muted-foreground">
+                              Total {formatEuro(r.totals.ttc)}
+                            </span>
+                            <Badge className="border-amber-300 bg-amber-100 text-amber-800">
+                              Reste {formatEuro(r.remainingTtc)}
+                            </Badge>
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </details>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : (
       <div className="space-y-2">
         <h2 className="text-sm font-medium text-muted-foreground">
           Commandes facturées
@@ -437,6 +632,7 @@ export default async function EncaissementsPage({
           </div>
         )}
       </div>
+      )}
     </div>
   );
 }
