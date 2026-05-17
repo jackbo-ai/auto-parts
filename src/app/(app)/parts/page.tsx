@@ -10,7 +10,7 @@ import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { CustomRangeInput } from "@/components/dashboard/custom-range-input";
 import { PeriodFilter } from "@/components/dashboard/period-filter";
-import { formatEuro, formatNumber } from "@/lib/utils";
+import { categoryTone, formatEuro, formatNumber } from "@/lib/utils";
 import { describePeriod, parsePeriod, periodBounds } from "@/lib/period";
 import { partsPmpMap, partsSalePmpMap } from "@/lib/pmp";
 import { deletePart, resetPartStock } from "./actions";
@@ -233,7 +233,11 @@ export default async function PartsPage({
             <div className="mt-1 text-sm">{p.name}</div>
             <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
               {p.brand && <span>{p.brand.name}</span>}
-              {p.category && <span>· {p.category.name}</span>}
+              {p.category && (
+                <Badge className={categoryTone(p.category.name)}>
+                  {p.category.name}
+                </Badge>
+              )}
               {!p.active && (
                 <Badge className="border-slate-300 bg-slate-200 text-slate-700">
                   Inactive
@@ -307,8 +311,14 @@ export default async function PartsPage({
                     </div>
                   )}
                 </td>
-                <td className="px-4 py-3 text-muted-foreground">
-                  {p.category?.name ?? "—"}
+                <td className="px-4 py-3">
+                  {p.category ? (
+                    <Badge className={categoryTone(p.category.name)}>
+                      {p.category.name}
+                    </Badge>
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
                 </td>
                 <td className="px-4 py-3 tabular-nums">
                   {formatEuro(salePmpMap.get(p.id))}

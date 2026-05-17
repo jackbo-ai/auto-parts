@@ -14,7 +14,12 @@ import { SupplierFilter } from "@/components/dashboard/supplier-filter";
 import { formatDate, formatEuro } from "@/lib/utils";
 import { describePeriod, parsePeriod, periodBounds } from "@/lib/period";
 import { orderTotals } from "@/lib/totals";
-import { PURCHASE_STATUS_BADGE, PURCHASE_STATUS_LABELS } from "@/lib/orders";
+import {
+  PURCHASE_STATUS_BADGE,
+  PURCHASE_STATUS_ICON,
+  PURCHASE_STATUS_ICON_TONE,
+  PURCHASE_STATUS_LABELS,
+} from "@/lib/orders";
 
 type PurchaseOrderRow = Prisma.PurchaseOrderGetPayload<{
   include: { supplier: { select: { name: true } }; lines: true };
@@ -26,6 +31,7 @@ function OrdersTable({ orders }: { orders: PurchaseOrderRow[] }) {
       <table className="w-full text-sm">
         <thead className="border-b bg-muted/60 text-left text-xs uppercase text-muted-foreground">
           <tr>
+            <th className="w-10 px-2 py-3" aria-label="Statut" />
             <th className="px-4 py-3">Référence</th>
             <th className="px-4 py-3">Fournisseur</th>
             <th className="px-4 py-3">Date</th>
@@ -37,11 +43,20 @@ function OrdersTable({ orders }: { orders: PurchaseOrderRow[] }) {
         <tbody>
           {orders.map((o) => {
             const totals = orderTotals(o.lines);
+            const Icon = PURCHASE_STATUS_ICON[o.status];
             return (
               <tr
                 key={o.id}
                 className="border-b last:border-0 hover:bg-accent/40"
               >
+                <td className="px-2 py-3">
+                  <span
+                    title={PURCHASE_STATUS_LABELS[o.status]}
+                    className={`inline-flex h-7 w-7 items-center justify-center rounded-full bg-muted/60 ${PURCHASE_STATUS_ICON_TONE[o.status]}`}
+                  >
+                    <Icon className="h-4 w-4" />
+                  </span>
+                </td>
                 <td className="px-4 py-3">
                   <Link
                     href={`/purchase-orders/${o.id}`}

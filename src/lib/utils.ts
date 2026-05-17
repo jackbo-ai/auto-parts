@@ -63,6 +63,30 @@ export function margin(
   return { value, pct };
 }
 
+// Palette pastel pour les chips de catégorie : on hash le libellé pour assigner
+// une teinte stable à chaque catégorie, indépendamment de sa position en base.
+const CATEGORY_TONES = [
+  "border-rose-300 bg-rose-100 text-rose-800",
+  "border-amber-300 bg-amber-100 text-amber-800",
+  "border-emerald-300 bg-emerald-100 text-emerald-800",
+  "border-sky-300 bg-sky-100 text-sky-800",
+  "border-violet-300 bg-violet-100 text-violet-800",
+  "border-fuchsia-300 bg-fuchsia-100 text-fuchsia-800",
+  "border-orange-300 bg-orange-100 text-orange-800",
+  "border-teal-300 bg-teal-100 text-teal-800",
+  "border-indigo-300 bg-indigo-100 text-indigo-800",
+  "border-lime-300 bg-lime-100 text-lime-800",
+];
+
+export function categoryTone(key: string | null | undefined) {
+  if (!key) return "border-slate-300 bg-slate-100 text-slate-700";
+  let h = 0;
+  for (let i = 0; i < key.length; i++) {
+    h = (h * 31 + key.charCodeAt(i)) | 0;
+  }
+  return CATEGORY_TONES[Math.abs(h) % CATEGORY_TONES.length];
+}
+
 export function slugify(input: string) {
   return input
     .toLowerCase()
