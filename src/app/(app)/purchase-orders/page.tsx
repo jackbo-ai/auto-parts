@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUser, canManageOrders } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { CategoryFilter } from "@/components/dashboard/category-filter";
 import { CustomRangeInput } from "@/components/dashboard/custom-range-input";
 import { PeriodFilter } from "@/components/dashboard/period-filter";
 import { SupplierFilter } from "@/components/dashboard/supplier-filter";
@@ -78,6 +79,7 @@ export default async function PurchaseOrdersPage({
     from?: string;
     to?: string;
     supplier?: string;
+    category?: string;
   }>;
 }) {
   const me = await requireUser();
@@ -87,11 +89,13 @@ export default async function PurchaseOrdersPage({
     from: fromParam,
     to: toParam,
     supplier: supplierParam,
+    category: categoryParam,
   } = await searchParams;
   const range = parsePeriod(rangeParam);
   const bounds = periodBounds(range, { from: fromParam, to: toParam });
   const periodLabel = describePeriod(range, bounds);
   const supplierId = supplierParam?.trim() || undefined;
+  const categoryId = categoryParam?.trim() || undefined;
 
   const orderDateFilter: { gte?: Date; lte?: Date } | undefined =
     bounds.start || bounds.end
@@ -101,11 +105,16 @@ export default async function PurchaseOrdersPage({
         }
       : undefined;
 
-  const [orders, suppliers] = await Promise.all([
+  const [orders, suppliers, categories] = await Promise.all([
     prisma.purchaseOrder.findMany({
       where: {
         ...(orderDateFilter ? { orderDate: orderDateFilter } : {}),
         ...(supplierId ? { supplierId } : {}),
+        // Catégorie : on retient les commandes qui ont au moins une ligne avec
+        // une pièce de la catégorie sélectionnée.
+        ...(categoryId
+          ? { lines: { some: { part: { categoryId } } } }
+          : {}),
       },
       orderBy: { orderDate: "desc" },
       include: {
@@ -117,9 +126,16 @@ export default async function PurchaseOrdersPage({
       orderBy: { name: "asc" },
       select: { id: true, name: true },
     }),
+    prisma.category.findMany({
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
+    }),
   ]);
   const selectedSupplier = supplierId
     ? suppliers.find((s) => s.id === supplierId)
+    : undefined;
+  const selectedCategory = categoryId
+    ? categories.find((c) => c.id === categoryId)
     : undefined;
 
   const activeOrders = orders.filter(
@@ -138,14 +154,16 @@ export default async function PurchaseOrdersPage({
             {orders.length} commande{orders.length > 1 ? "s" : ""} ·{" "}
             <span className="text-foreground">{periodLabel}</span>
             {selectedSupplier ? ` · ${selectedSupplier.name}` : ""}
+            {selectedCategory ? ` · ${selectedCategory.name}` : ""}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <SupplierFilter suppliers={suppliers} current={supplierId ?? ""} />
+          <CategoryFilter categories={categories} current={categoryId ?? ""} />
           <PeriodFilter
             current={range}
             basePath="/purchase-orders"
-            preserve={{ supplier: supplierId }}
+            preserve={{ supplier: supplierId, category: categoryId }}
           />
           <CustomRangeInput
             from={fromParam ?? ""}

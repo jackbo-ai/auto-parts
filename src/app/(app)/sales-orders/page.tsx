@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUser, canManageOrders } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { CategoryFilter } from "@/components/dashboard/category-filter";
 import { CustomRangeInput } from "@/components/dashboard/custom-range-input";
 import { CustomerFilter } from "@/components/dashboard/customer-filter";
 import { PeriodFilter } from "@/components/dashboard/period-filter";
@@ -78,6 +79,7 @@ export default async function SalesOrdersPage({
     from?: string;
     to?: string;
     customer?: string;
+    category?: string;
   }>;
 }) {
   const me = await requireUser();
@@ -87,11 +89,13 @@ export default async function SalesOrdersPage({
     from: fromParam,
     to: toParam,
     customer: customerParam,
+    category: categoryParam,
   } = await searchParams;
   const range = parsePeriod(rangeParam);
   const bounds = periodBounds(range, { from: fromParam, to: toParam });
   const periodLabel = describePeriod(range, bounds);
   const customerId = customerParam?.trim() || undefined;
+  const categoryId = categoryParam?.trim() || undefined;
 
   const orderDateFilter: { gte?: Date; lte?: Date } | undefined =
     bounds.start || bounds.end
@@ -101,11 +105,16 @@ export default async function SalesOrdersPage({
         }
       : undefined;
 
-  const [orders, customers] = await Promise.all([
+  const [orders, customers, categories] = await Promise.all([
     prisma.salesOrder.findMany({
       where: {
         ...(orderDateFilter ? { orderDate: orderDateFilter } : {}),
         ...(customerId ? { customerId } : {}),
+        // Catégorie : on retient les commandes qui ont au moins une ligne avec
+        // une pièce de la catégorie sélectionnée.
+        ...(categoryId
+          ? { lines: { some: { part: { categoryId } } } }
+          : {}),
       },
       orderBy: { orderDate: "desc" },
       include: {
@@ -117,9 +126,16 @@ export default async function SalesOrdersPage({
       orderBy: { name: "asc" },
       select: { id: true, name: true },
     }),
+    prisma.category.findMany({
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
+    }),
   ]);
   const selectedCustomer = customerId
     ? customers.find((c) => c.id === customerId)
+    : undefined;
+  const selectedCategory = categoryId
+    ? categories.find((c) => c.id === categoryId)
     : undefined;
 
   const activeOrders = orders.filter(
@@ -138,14 +154,16 @@ export default async function SalesOrdersPage({
             {orders.length} commande{orders.length > 1 ? "s" : ""} ·{" "}
             <span className="text-foreground">{periodLabel}</span>
             {selectedCustomer ? ` · ${selectedCustomer.name}` : ""}
+            {selectedCategory ? ` · ${selectedCategory.name}` : ""}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <CustomerFilter customers={customers} current={customerId ?? ""} />
+          <CategoryFilter categories={categories} current={categoryId ?? ""} />
           <PeriodFilter
             current={range}
             basePath="/sales-orders"
-            preserve={{ customer: customerId }}
+            preserve={{ customer: customerId, category: categoryId }}
           />
           <CustomRangeInput
             from={fromParam ?? ""}
