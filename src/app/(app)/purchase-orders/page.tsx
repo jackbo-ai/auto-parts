@@ -188,33 +188,34 @@ export default async function PurchaseOrdersPage({
             {partRef ? ` · ${partRef}` : ""}
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <SupplierFilter suppliers={suppliers} current={supplierId ?? ""} />
-          <CategoryFilter categories={categories} current={categoryId ?? ""} />
-          <PartRefFilter refs={allRefs} current={partRef ?? ""} />
-          <PeriodFilter
-            current={range}
-            basePath="/purchase-orders"
-            preserve={{
-              supplier: supplierId,
-              category: categoryId,
-              part: partRef,
-            }}
-          />
-          <CustomRangeInput
-            from={fromParam ?? ""}
-            to={toParam ?? ""}
-            active={range === "custom"}
-          />
-          {canManage && (
-            <Button asChild>
-              <Link href="/purchase-orders/new">
-                <Plus className="h-4 w-4" />
-                Nouvelle commande
-              </Link>
-            </Button>
-          )}
-        </div>
+        {canManage && (
+          <Button asChild>
+            <Link href="/purchase-orders/new">
+              <Plus className="h-4 w-4" />
+              Nouvelle commande
+            </Link>
+          </Button>
+        )}
+      </div>
+
+      <div className="flex items-center justify-center gap-2 overflow-x-auto rounded-lg border bg-card p-2">
+        <SupplierFilter suppliers={suppliers} current={supplierId ?? ""} />
+        <CategoryFilter categories={categories} current={categoryId ?? ""} />
+        <PartRefFilter refs={allRefs} current={partRef ?? ""} />
+        <PeriodFilter
+          current={range}
+          basePath="/purchase-orders"
+          preserve={{
+            supplier: supplierId,
+            category: categoryId,
+            part: partRef,
+          }}
+        />
+        <CustomRangeInput
+          from={fromParam ?? ""}
+          to={toParam ?? ""}
+          active={range === "custom"}
+        />
       </div>
 
       {orders.length === 0 && (
