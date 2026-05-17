@@ -15,6 +15,14 @@ const optionalText = z
   .transform((v) => (v === "" ? undefined : v))
   .optional();
 
+const optionalNonNegativeFloat = z
+  .string()
+  .transform((v) => v.trim().replace(",", "."))
+  .transform((v) => (v === "" ? undefined : Number(v)))
+  .pipe(
+    z.number().nonnegative("La limite doit être positive ou nulle").optional(),
+  );
+
 const customerSchema = z.object({
   name: z.string().trim().min(1, "Le nom est obligatoire"),
   email: z
@@ -26,6 +34,7 @@ const customerSchema = z.object({
   phone: optionalText,
   address: optionalText,
   notes: optionalText,
+  creditLimit: optionalNonNegativeFloat,
 });
 
 export async function createCustomer(formData: FormData) {
@@ -35,7 +44,12 @@ export async function createCustomer(formData: FormData) {
     throw new Error(parsed.error.issues[0]?.message ?? "Formulaire invalide");
   }
 
-  await prisma.customer.create({ data: parsed.data });
+  await prisma.customer.create({
+    data: {
+      ...parsed.data,
+      creditLimit: parsed.data.creditLimit ?? null,
+    },
+  });
   revalidatePath("/admin/customers");
 }
 
@@ -56,6 +70,7 @@ export async function updateCustomer(formData: FormData) {
       phone: parsed.data.phone ?? null,
       address: parsed.data.address ?? null,
       notes: parsed.data.notes ?? null,
+      creditLimit: parsed.data.creditLimit ?? null,
     },
   });
   revalidatePath("/admin/customers");

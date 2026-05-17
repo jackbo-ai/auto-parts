@@ -69,13 +69,17 @@ model Supplier {
 
 // Clients en aval — à qui l'on vend les pièces.
 model Customer {
-  id        String   @id @default(cuid())
-  name      String
-  email     String?
-  phone     String?
-  address   String?
-  notes     String?
-  createdAt DateTime @default(now())
+  id          String   @id @default(cuid())
+  name        String
+  email       String?
+  phone       String?
+  address     String?
+  notes       String?
+  // Limite de crédit accordée au client (TTC, EUR). null = pas de limite fixée.
+  // Sert d'indicateur visuel sur la fiche : on compare l'encours TTC à cette
+  // valeur, mais aucun blocage métier n'est appliqué automatiquement.
+  creditLimit Float?
+  createdAt   DateTime @default(now())
 
   salesOrders SalesOrder[]
 }

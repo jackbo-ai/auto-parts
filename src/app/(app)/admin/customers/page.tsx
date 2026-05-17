@@ -27,6 +27,13 @@ export default async function CustomersPage() {
           <Input name="email" type="email" placeholder="Email" />
           <Input name="phone" placeholder="Téléphone" />
           <Input name="address" placeholder="Adresse" />
+          <Input
+            name="creditLimit"
+            type="number"
+            step="0.01"
+            min="0"
+            placeholder="Limite de crédit TTC (€)"
+          />
           <Textarea
             name="notes"
             placeholder="Notes (conditions, contact…)"
