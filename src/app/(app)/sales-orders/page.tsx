@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { CategoryFilter } from "@/components/dashboard/category-filter";
 import { CustomRangeInput } from "@/components/dashboard/custom-range-input";
 import { CustomerFilter } from "@/components/dashboard/customer-filter";
+import { PartRefFilter } from "@/components/dashboard/part-ref-filter";
 import { PeriodFilter } from "@/components/dashboard/period-filter";
 import { formatDate, formatEuro } from "@/lib/utils";
 import { describePeriod, parsePeriod, periodBounds } from "@/lib/period";
@@ -80,6 +81,7 @@ export default async function SalesOrdersPage({
     to?: string;
     customer?: string;
     category?: string;
+    part?: string;
   }>;
 }) {
   const me = await requireUser();
@@ -90,12 +92,14 @@ export default async function SalesOrdersPage({
     to: toParam,
     customer: customerParam,
     category: categoryParam,
+    part: partParam,
   } = await searchParams;
   const range = parsePeriod(rangeParam);
   const bounds = periodBounds(range, { from: fromParam, to: toParam });
   const periodLabel = describePeriod(range, bounds);
   const customerId = customerParam?.trim() || undefined;
   const categoryId = categoryParam?.trim() || undefined;
+  const partRef = partParam?.trim() || undefined;
 
   const orderDateFilter: { gte?: Date; lte?: Date } | undefined =
     bounds.start || bounds.end
@@ -105,15 +109,21 @@ export default async function SalesOrdersPage({
         }
       : undefined;
 
-  const [orders, customers, categories] = await Promise.all([
+  // Combine catégorie + référence article dans le même prédicat `lines.some.part`
+  // pour s'assurer qu'une même ligne valide les deux critères.
+  const linePartFilter: { categoryId?: string; reference?: { contains: string } } =
+    {};
+  if (categoryId) linePartFilter.categoryId = categoryId;
+  if (partRef) linePartFilter.reference = { contains: partRef };
+  const hasLineFilter = Object.keys(linePartFilter).length > 0;
+
+  const [orders, customers, categories, allRefs] = await Promise.all([
     prisma.salesOrder.findMany({
       where: {
         ...(orderDateFilter ? { orderDate: orderDateFilter } : {}),
         ...(customerId ? { customerId } : {}),
-        // Catégorie : on retient les commandes qui ont au moins une ligne avec
-        // une pièce de la catégorie sélectionnée.
-        ...(categoryId
-          ? { lines: { some: { part: { categoryId } } } }
+        ...(hasLineFilter
+          ? { lines: { some: { part: linePartFilter } } }
           : {}),
       },
       orderBy: { orderDate: "desc" },
@@ -129,6 +139,10 @@ export default async function SalesOrdersPage({
     prisma.category.findMany({
       orderBy: { name: "asc" },
       select: { id: true, name: true },
+    }),
+    prisma.part.findMany({
+      orderBy: { reference: "asc" },
+      select: { reference: true, name: true },
     }),
   ]);
   const selectedCustomer = customerId
@@ -155,15 +169,21 @@ export default async function SalesOrdersPage({
             <span className="text-foreground">{periodLabel}</span>
             {selectedCustomer ? ` · ${selectedCustomer.name}` : ""}
             {selectedCategory ? ` · ${selectedCategory.name}` : ""}
+            {partRef ? ` · ${partRef}` : ""}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <CustomerFilter customers={customers} current={customerId ?? ""} />
           <CategoryFilter categories={categories} current={categoryId ?? ""} />
+          <PartRefFilter refs={allRefs} current={partRef ?? ""} />
           <PeriodFilter
             current={range}
             basePath="/sales-orders"
-            preserve={{ customer: customerId, category: categoryId }}
+            preserve={{
+              customer: customerId,
+              category: categoryId,
+              part: partRef,
+            }}
           />
           <CustomRangeInput
             from={fromParam ?? ""}
