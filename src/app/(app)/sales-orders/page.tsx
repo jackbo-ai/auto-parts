@@ -6,7 +6,10 @@ import { prisma } from "@/lib/prisma";
 import { requireUser, canManageOrders } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { CustomRangeInput } from "@/components/dashboard/custom-range-input";
+import { PeriodFilter } from "@/components/dashboard/period-filter";
 import { formatDate, formatEuro } from "@/lib/utils";
+import { describePeriod, parsePeriod, periodBounds } from "@/lib/period";
 import { orderTotals } from "@/lib/totals";
 import { SALES_STATUS_BADGE, SALES_STATUS_LABELS } from "@/lib/orders";
 
@@ -66,11 +69,29 @@ function OrdersTable({ orders }: { orders: SalesOrderRow[] }) {
   );
 }
 
-export default async function SalesOrdersPage() {
+export default async function SalesOrdersPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ range?: string; from?: string; to?: string }>;
+}) {
   const me = await requireUser();
   const canManage = canManageOrders(me.role);
+  const { range: rangeParam, from: fromParam, to: toParam } =
+    await searchParams;
+  const range = parsePeriod(rangeParam);
+  const bounds = periodBounds(range, { from: fromParam, to: toParam });
+  const periodLabel = describePeriod(range, bounds);
+
+  const orderDateFilter: { gte?: Date; lte?: Date } | undefined =
+    bounds.start || bounds.end
+      ? {
+          ...(bounds.start ? { gte: bounds.start } : {}),
+          ...(bounds.end ? { lte: bounds.end } : {}),
+        }
+      : undefined;
 
   const orders = await prisma.salesOrder.findMany({
+    where: orderDateFilter ? { orderDate: orderDateFilter } : undefined,
     orderBy: { orderDate: "desc" },
     include: {
       customer: { select: { name: true } },
@@ -87,21 +108,35 @@ export default async function SalesOrdersPage() {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Commandes client</h1>
-        {canManage && (
-          <Button asChild>
-            <Link href="/sales-orders/new">
-              <Plus className="h-4 w-4" />
-              Nouvelle commande
-            </Link>
-          </Button>
-        )}
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold">Commandes client</h1>
+          <p className="text-sm text-muted-foreground">
+            {orders.length} commande{orders.length > 1 ? "s" : ""} ·{" "}
+            <span className="text-foreground">{periodLabel}</span>
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <PeriodFilter current={range} basePath="/sales-orders" />
+          <CustomRangeInput
+            from={fromParam ?? ""}
+            to={toParam ?? ""}
+            active={range === "custom"}
+          />
+          {canManage && (
+            <Button asChild>
+              <Link href="/sales-orders/new">
+                <Plus className="h-4 w-4" />
+                Nouvelle commande
+              </Link>
+            </Button>
+          )}
+        </div>
       </div>
 
       {orders.length === 0 && (
         <div className="rounded-lg border bg-card px-4 py-10 text-center text-sm text-muted-foreground">
-          Aucune commande client.
+          Aucune commande client sur cette période.
         </div>
       )}
 
