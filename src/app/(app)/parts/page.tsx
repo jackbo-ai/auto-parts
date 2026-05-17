@@ -8,7 +8,10 @@ import { ConfirmSubmit } from "@/components/confirm-submit";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { CustomRangeInput } from "@/components/dashboard/custom-range-input";
+import { PeriodFilter } from "@/components/dashboard/period-filter";
 import { formatEuro, formatNumber } from "@/lib/utils";
+import { describePeriod, parsePeriod, periodBounds } from "@/lib/period";
 import { partsPmpMap, partsSalePmpMap } from "@/lib/pmp";
 import { deletePart, resetPartStock } from "./actions";
 
@@ -27,6 +30,9 @@ export default async function PartsPage({
     category?: string;
     brand?: string;
     status?: string;
+    range?: string;
+    from?: string;
+    to?: string;
   }>;
 }) {
   const me = await requireUser();
@@ -35,6 +41,9 @@ export default async function PartsPage({
   const q = params.q?.trim() ?? "";
   const category = params.category?.trim() ?? "";
   const brand = params.brand?.trim() ?? "";
+  const range = parsePeriod(params.range);
+  const bounds = periodBounds(range, { from: params.from, to: params.to });
+  const periodLabel = describePeriod(range, bounds);
 
   const where: Prisma.PartWhereInput = {};
   if (q) {
@@ -48,6 +57,12 @@ export default async function PartsPage({
   if (brand) where.brand = { name: { contains: brand } };
   if (params.status === "active") where.active = true;
   if (params.status === "inactive") where.active = false;
+  if (bounds.start || bounds.end) {
+    where.createdAt = {
+      ...(bounds.start ? { gte: bounds.start } : {}),
+      ...(bounds.end ? { lte: bounds.end } : {}),
+    };
+  }
 
   const [parts, categories, brands, allRefs, pmpMap, salePmpMap] =
     await Promise.all([
@@ -72,9 +87,31 @@ export default async function PartsPage({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-4">
-        <h1 className="text-2xl font-semibold">Catalogue</h1>
-        <div className="flex gap-2">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold">Catalogue</h1>
+          <p className="text-sm text-muted-foreground">
+            {formatNumber(parts.length)} pièce
+            {parts.length > 1 ? "s" : ""} · créées sur{" "}
+            <span className="text-foreground">{periodLabel}</span>
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <PeriodFilter
+            current={range}
+            basePath="/parts"
+            preserve={{
+              q: q || undefined,
+              category: category || undefined,
+              brand: brand || undefined,
+              status: params.status,
+            }}
+          />
+          <CustomRangeInput
+            from={params.from ?? ""}
+            to={params.to ?? ""}
+            active={range === "custom"}
+          />
           {canManage && (
             <>
               <Button asChild variant="outline" size="sm">
@@ -95,6 +132,14 @@ export default async function PartsPage({
       </div>
 
       <form className="flex flex-wrap items-center gap-2" action="/parts">
+        {/* Préserve la période quand on soumet le formulaire de recherche. */}
+        {params.range && (
+          <input type="hidden" name="range" value={params.range} />
+        )}
+        {params.from && (
+          <input type="hidden" name="from" value={params.from} />
+        )}
+        {params.to && <input type="hidden" name="to" value={params.to} />}
         <div className="relative max-w-xs flex-1">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
