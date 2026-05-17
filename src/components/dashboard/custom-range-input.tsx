@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useTransition } from "react";
 import { cn } from "@/lib/utils";
 
@@ -14,6 +14,7 @@ export function CustomRangeInput({
   active: boolean;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const [pending, startTransition] = useTransition();
 
@@ -33,7 +34,7 @@ export function CustomRangeInput({
     }
     const qs = next.toString();
     startTransition(() => {
-      router.push(qs ? `/?${qs}` : "/", { scroll: false });
+      router.push(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
     });
   }
 

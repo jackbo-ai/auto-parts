@@ -4,13 +4,13 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useTransition } from "react";
 import { Select } from "@/components/ui/select";
 
-type SupplierOption = { id: string; name: string };
+type CustomerOption = { id: string; name: string };
 
-export function SupplierFilter({
-  suppliers,
+export function CustomerFilter({
+  customers,
   current,
 }: {
-  suppliers: SupplierOption[];
+  customers: CustomerOption[];
   current: string;
 }) {
   const router = useRouter();
@@ -20,8 +20,8 @@ export function SupplierFilter({
 
   function onChange(value: string) {
     const next = new URLSearchParams(searchParams.toString());
-    if (value) next.set("supplier", value);
-    else next.delete("supplier");
+    if (value) next.set("customer", value);
+    else next.delete("customer");
     const qs = next.toString();
     startTransition(() => {
       router.push(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
@@ -30,16 +30,16 @@ export function SupplierFilter({
 
   return (
     <Select
-      aria-label="Fournisseur"
+      aria-label="Client"
       className="h-9 w-[200px] text-xs"
       value={current}
       disabled={pending}
       onChange={(e) => onChange(e.target.value)}
     >
-      <option value="">Tous fournisseurs</option>
-      {suppliers.map((s) => (
-        <option key={s.id} value={s.id}>
-          {s.name}
+      <option value="">Tous clients</option>
+      {customers.map((c) => (
+        <option key={c.id} value={c.id}>
+          {c.name}
         </option>
       ))}
     </Select>

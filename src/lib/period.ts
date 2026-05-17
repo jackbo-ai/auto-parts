@@ -92,6 +92,49 @@ export function periodBounds(
   }
 }
 
+// Découpe la période en buckets pour les séries temporelles. Buckets quotidiens
+// si la fenêtre ≤ 90 jours, mensuels au-delà. `end` est inclus.
+export type Bucket = { key: string; label: string; start: Date; end: Date };
+
+export function periodBuckets(start: Date, end: Date): Bucket[] {
+  const spanDays = Math.max(
+    1,
+    Math.ceil((end.getTime() - start.getTime()) / 86_400_000),
+  );
+  const buckets: Bucket[] = [];
+
+  if (spanDays <= 90) {
+    const cur = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+    while (cur.getTime() <= end.getTime()) {
+      const next = new Date(cur);
+      next.setDate(next.getDate() + 1);
+      buckets.push({
+        key: `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, "0")}-${String(cur.getDate()).padStart(2, "0")}`,
+        label: `${String(cur.getDate()).padStart(2, "0")}/${String(cur.getMonth() + 1).padStart(2, "0")}`,
+        start: new Date(cur),
+        end: new Date(next.getTime() - 1),
+      });
+      cur.setDate(cur.getDate() + 1);
+    }
+  } else {
+    const cur = new Date(start.getFullYear(), start.getMonth(), 1);
+    while (cur.getTime() <= end.getTime()) {
+      const next = new Date(cur.getFullYear(), cur.getMonth() + 1, 1);
+      buckets.push({
+        key: `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, "0")}`,
+        label: cur.toLocaleString("fr-FR", {
+          month: "short",
+          year: "2-digit",
+        }),
+        start: new Date(cur),
+        end: new Date(next.getTime() - 1),
+      });
+      cur.setMonth(cur.getMonth() + 1);
+    }
+  }
+  return buckets;
+}
+
 // Libellé humain de la période courante — utilisé sous le titre et dans les
 // en-têtes de cartes.
 export function describePeriod(

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import {
   Contact,
+  CreditCard,
   FolderTree,
   Package,
   SlidersHorizontal,
@@ -22,6 +23,7 @@ export default async function AdminPage() {
     brandCount,
     customerCount,
     stockReasonCount,
+    paymentMethodCount,
   ] = await Promise.all([
     prisma.user.count(),
     prisma.part.count(),
@@ -29,6 +31,7 @@ export default async function AdminPage() {
     prisma.brand.count(),
     prisma.customer.count(),
     prisma.stockMovementReason.count(),
+    prisma.paymentMethod.count(),
   ]);
 
   const sections = [
@@ -73,6 +76,13 @@ export default async function AdminPage() {
       description: "Libellés proposés à la saisie d'un mouvement de stock",
       icon: SlidersHorizontal,
       meta: `${stockReasonCount} motif${stockReasonCount > 1 ? "s" : ""}`,
+    },
+    {
+      href: "/admin/payment-methods",
+      label: "Modes de paiement",
+      description: "Libellés proposés à la saisie d'un encaissement",
+      icon: CreditCard,
+      meta: `${paymentMethodCount} mode${paymentMethodCount > 1 ? "s" : ""}`,
     },
   ];
 

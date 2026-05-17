@@ -29,6 +29,7 @@ model User {
   stockMovements StockMovement[]
   purchaseOrders PurchaseOrder[]
   salesOrders    SalesOrder[]
+  payments       Payment[]
 }
 
 // Arborescence de catégories (ex. Freinage > Plaquettes).
@@ -217,7 +218,36 @@ model SalesOrder {
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
 
-  lines SalesOrderLine[]
+  lines    SalesOrderLine[]
+  payments Payment[]
+}
+
+// Modes de paiement configurables (gérés en admin). Le libellé est dénormalisé
+// sur Payment.method pour préserver l'historique si un mode est renommé ou
+// supprimé après coup.
+model PaymentMethod {
+  id        String   @id @default(cuid())
+  label     String   @unique
+  createdAt DateTime @default(now())
+}
+
+// Encaissement appliqué à une commande client facturée. On accepte les paiements
+// partiels : une commande peut recevoir plusieurs Payments, l'encours est
+// total_ttc − somme(payments.amountTtc).
+model Payment {
+  id           String     @id @default(cuid())
+  salesOrderId String
+  salesOrder   SalesOrder @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
+  amountHt     Float
+  amountTtc    Float
+  method       String // libellé dénormalisé (cf. PaymentMethod)
+  paidAt       DateTime   @default(now())
+  notes        String?
+
+  createdById String?
+  createdBy   User?    @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 model SalesOrderLine {

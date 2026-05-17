@@ -1,5 +1,6 @@
 import Link from "next/link";
 import {
+  Banknote,
   Boxes,
   LayoutDashboard,
   Package,
@@ -18,6 +19,7 @@ const NAV = [
   { href: "/stock", label: "Stock", icon: Boxes },
   { href: "/purchase-orders", label: "Achats", icon: ShoppingCart },
   { href: "/sales-orders", label: "Ventes", icon: Receipt },
+  { href: "/encaissements", label: "Encaissements", icon: Banknote },
   { href: "/suppliers", label: "Fournisseurs", icon: Truck },
   { href: "/parts", label: "Catalogue", icon: Package },
 ];

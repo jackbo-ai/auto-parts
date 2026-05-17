@@ -10,9 +10,11 @@ import { cn } from "@/lib/utils";
 export function PeriodFilter({
   current,
   preserve,
+  basePath = "/",
 }: {
   current: PeriodRange;
   preserve?: Record<string, string | undefined>;
+  basePath?: string;
 }) {
   return (
     <div
@@ -27,7 +29,7 @@ export function PeriodFilter({
         for (const [k, v] of Object.entries(preserve ?? {})) {
           if (v) qs.set(k, v);
         }
-        const href = qs.toString() ? `/?${qs.toString()}` : "/";
+        const href = qs.toString() ? `${basePath}?${qs.toString()}` : basePath;
         return (
           <Link
             key={range}
