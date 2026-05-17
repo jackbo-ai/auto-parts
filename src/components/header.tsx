@@ -7,7 +7,6 @@ import {
   Receipt,
   Settings,
   ShoppingCart,
-  Truck,
 } from "lucide-react";
 import type { SessionUser } from "@/lib/permissions";
 import { ROLE_LABELS, canManageUsers } from "@/lib/permissions";
@@ -20,7 +19,6 @@ const NAV = [
   { href: "/purchase-orders", label: "Achats", icon: ShoppingCart },
   { href: "/sales-orders", label: "Ventes", icon: Receipt },
   { href: "/encaissements", label: "Encaissements", icon: Banknote },
-  { href: "/suppliers", label: "Fournisseurs", icon: Truck },
   { href: "/parts", label: "Catalogue", icon: Package },
 ];
 

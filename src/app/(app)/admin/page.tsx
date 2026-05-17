@@ -6,6 +6,7 @@ import {
   Package,
   SlidersHorizontal,
   Tag,
+  Truck,
   Upload,
   Users,
 } from "lucide-react";
@@ -22,6 +23,7 @@ export default async function AdminPage() {
     categoryCount,
     brandCount,
     customerCount,
+    supplierCount,
     stockReasonCount,
     paymentMethodCount,
   ] = await Promise.all([
@@ -30,6 +32,7 @@ export default async function AdminPage() {
     prisma.category.count(),
     prisma.brand.count(),
     prisma.customer.count(),
+    prisma.supplier.count(),
     prisma.stockMovementReason.count(),
     prisma.paymentMethod.count(),
   ]);
@@ -48,6 +51,13 @@ export default async function AdminPage() {
       description: "Fiches clients et historique de commandes",
       icon: Contact,
       meta: `${customerCount} client${customerCount > 1 ? "s" : ""}`,
+    },
+    {
+      href: "/suppliers",
+      label: "Fournisseurs",
+      description: "Fiches fournisseurs et historique d'achats",
+      icon: Truck,
+      meta: `${supplierCount} fournisseur${supplierCount > 1 ? "s" : ""}`,
     },
     {
       href: "/admin/articles",
