@@ -8,12 +8,15 @@ import {
   CalendarClock,
   PackageCheck,
   PackageX,
+  SlidersHorizontal,
 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/permissions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
 import { DigitalReadout } from "@/components/dashboard/digital-readout";
 import {
   formatDate,
@@ -22,6 +25,7 @@ import {
   formatNumber,
 } from "@/lib/utils";
 import { partsPmpMap } from "@/lib/pmp";
+import { recordStockMovement } from "./actions";
 
 export default async function StockPage({
   searchParams,
@@ -31,7 +35,7 @@ export default async function StockPage({
   await requireUser();
   const params = await searchParams;
 
-  const [parts, recentMovements, pmpAchatMap, inactiveCount] =
+  const [parts, recentMovements, pmpAchatMap, inactiveCount, stockReasons] =
     await Promise.all([
       prisma.part.findMany({
         where: { active: true },
@@ -55,6 +59,10 @@ export default async function StockPage({
       }),
       partsPmpMap(),
       prisma.part.count({ where: { active: false } }),
+      prisma.stockMovementReason.findMany({
+        orderBy: { label: "asc" },
+        select: { id: true, label: true },
+      }),
     ]);
 
   // « À réapprovisionner » = tout ce qui est au niveau du seuil ou en dessous,
@@ -133,6 +141,89 @@ export default async function StockPage({
           icon={<Archive className="h-3.5 w-3.5" />}
         />
       </div>
+
+      <section className="space-y-2">
+        <h2 className="flex items-center gap-2 text-base font-medium">
+          <SlidersHorizontal className="h-4 w-4" />
+          Saisir un mouvement de stock
+        </h2>
+        {stockReasons.length === 0 ? (
+          <div className="rounded-lg border bg-card px-4 py-6 text-sm text-muted-foreground">
+            Aucun motif de mouvement n&apos;est configuré.{" "}
+            <Link
+              href="/admin/stock-reasons"
+              className="font-medium text-foreground underline"
+            >
+              Ajouter un motif
+            </Link>{" "}
+            pour activer la saisie.
+          </div>
+        ) : (
+          <form
+            action={recordStockMovement}
+            className="grid gap-3 rounded-lg border bg-card p-4 sm:grid-cols-2 lg:grid-cols-5"
+          >
+            <div className="space-y-1.5 lg:col-span-2">
+              <Label htmlFor="partRef">Référence article</Label>
+              <Input
+                id="partRef"
+                name="partRef"
+                list="movement-part-refs"
+                placeholder="Saisir une référence…"
+                autoComplete="off"
+                required
+              />
+              <datalist id="movement-part-refs">
+                {parts.map((p) => (
+                  <option key={p.id} value={p.reference}>
+                    {p.name}
+                  </option>
+                ))}
+              </datalist>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="mov-type">Type</Label>
+              <Select id="mov-type" name="type" defaultValue="IN">
+                <option value="IN">Entrée (+)</option>
+                <option value="OUT">Sortie (−)</option>
+                <option value="ADJUSTMENT">Inventaire</option>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="mov-quantity">Quantité</Label>
+              <Input
+                id="mov-quantity"
+                name="quantity"
+                type="number"
+                min="1"
+                required
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="mov-reason">Motif</Label>
+              <Select id="mov-reason" name="reason" required defaultValue="">
+                <option value="" disabled>
+                  Sélectionner…
+                </option>
+                {stockReasons.map((r) => (
+                  <option key={r.id} value={r.label}>
+                    {r.label}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            <div className="sm:col-span-2 lg:col-span-5">
+              <Button type="submit">Enregistrer le mouvement</Button>
+              <p className="mt-1 text-xs text-muted-foreground">
+                <strong>Inventaire</strong> : recale le stock système sur le
+                stock réel constaté en magasin (après comptage, casse, vol,
+                erreur passée…). Saisir la quantité réellement observée — l’écart
+                est calculé automatiquement.
+              </p>
+            </div>
+          </form>
+        )}
+      </section>
 
       <section className="space-y-2">
         <h2 className="text-sm font-medium text-muted-foreground">

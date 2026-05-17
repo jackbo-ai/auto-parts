@@ -1,5 +1,13 @@
 import Link from "next/link";
-import { Contact, FolderTree, Package, Tag, Upload, Users } from "lucide-react";
+import {
+  Contact,
+  FolderTree,
+  Package,
+  SlidersHorizontal,
+  Tag,
+  Upload,
+  Users,
+} from "lucide-react";
 import { Role } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/permissions";
@@ -7,14 +15,21 @@ import { requireRole } from "@/lib/permissions";
 export default async function AdminPage() {
   await requireRole([Role.ADMIN]);
 
-  const [userCount, partCount, categoryCount, brandCount, customerCount] =
-    await Promise.all([
-      prisma.user.count(),
-      prisma.part.count(),
-      prisma.category.count(),
-      prisma.brand.count(),
-      prisma.customer.count(),
-    ]);
+  const [
+    userCount,
+    partCount,
+    categoryCount,
+    brandCount,
+    customerCount,
+    stockReasonCount,
+  ] = await Promise.all([
+    prisma.user.count(),
+    prisma.part.count(),
+    prisma.category.count(),
+    prisma.brand.count(),
+    prisma.customer.count(),
+    prisma.stockMovementReason.count(),
+  ]);
 
   const sections = [
     {
@@ -51,6 +66,13 @@ export default async function AdminPage() {
       description: "Équipementiers proposés sur la fiche pièce",
       icon: Tag,
       meta: `${brandCount} marque${brandCount > 1 ? "s" : ""}`,
+    },
+    {
+      href: "/admin/stock-reasons",
+      label: "Motifs de mouvement",
+      description: "Libellés proposés à la saisie d'un mouvement de stock",
+      icon: SlidersHorizontal,
+      meta: `${stockReasonCount} motif${stockReasonCount > 1 ? "s" : ""}`,
     },
   ];
 

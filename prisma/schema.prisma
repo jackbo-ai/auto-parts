@@ -131,6 +131,15 @@ enum StockMovementType {
   ADJUSTMENT // correction d'inventaire
 }
 
+// Motifs configurables (gérés en admin). Le libellé est dénormalisé sur
+// StockMovement.reason pour préserver l'historique si un motif est renommé
+// ou supprimé après coup.
+model StockMovementReason {
+  id        String   @id @default(cuid())
+  label     String   @unique
+  createdAt DateTime @default(now())
+}
+
 model StockMovement {
   id        String            @id @default(cuid())
   partId    String

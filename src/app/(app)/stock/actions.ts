@@ -7,7 +7,10 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/permissions";
 
 const movementSchema = z.object({
-  partId: z.string().min(1),
+  // partId est posé en hidden depuis la fiche pièce ; partRef est saisi via
+  // datalist sur l'onglet Stock. On exige l'un ou l'autre.
+  partId: z.string().optional(),
+  partRef: z.string().trim().optional(),
   type: z.nativeEnum(StockMovementType),
   // Always a positive magnitude in the form; the sign is derived from `type`.
   quantity: z
@@ -16,11 +19,7 @@ const movementSchema = z.object({
     .min(1, "La quantité est obligatoire")
     .transform((v) => Number(v))
     .pipe(z.number().int().positive("La quantité doit être positive")),
-  reason: z
-    .string()
-    .transform((v) => v.trim())
-    .transform((v) => (v === "" ? undefined : v))
-    .optional(),
+  reason: z.string().trim().min(1, "Le motif est obligatoire"),
 });
 
 // Records a stock movement and updates the part's denormalized stockQty in
@@ -31,7 +30,33 @@ export async function recordStockMovement(formData: FormData) {
   if (!parsed.success) {
     throw new Error(parsed.error.issues[0]?.message ?? "Formulaire invalide");
   }
-  const { partId, type, quantity, reason } = parsed.data;
+  const { type, quantity, reason } = parsed.data;
+  let resolvedPartId = parsed.data.partId;
+  if (!resolvedPartId && parsed.data.partRef) {
+    const match = await prisma.part.findFirst({
+      where: { reference: parsed.data.partRef },
+      select: { id: true },
+    });
+    if (!match) {
+      throw new Error(`Référence "${parsed.data.partRef}" introuvable.`);
+    }
+    resolvedPartId = match.id;
+  }
+  if (!resolvedPartId) {
+    throw new Error("Sélectionnez une pièce.");
+  }
+  const partId = resolvedPartId;
+
+  // Le motif doit correspondre à un libellé configuré dans l'admin.
+  const knownReason = await prisma.stockMovementReason.findUnique({
+    where: { label: reason },
+    select: { id: true },
+  });
+  if (!knownReason) {
+    throw new Error(
+      `Motif "${reason}" inconnu. Ajoutez-le dans Admin > Motifs de mouvement.`,
+    );
+  }
 
   await prisma.$transaction(async (tx) => {
     const part = await tx.part.findUnique({

@@ -83,9 +83,13 @@ export default async function PartDetailPage({
   // Ni le coût d'achat ni le prix de vente ne sont figés : on les déduit de
   // l'historique des commandes et on en tire un PMP à ce jour. La marge brute
   // se calcule sur ces deux PMP.
-  const [costHistory, salePriceHistory] = await Promise.all([
+  const [costHistory, salePriceHistory, stockReasons] = await Promise.all([
     partCostHistory(id),
     partSalePriceHistory(id),
+    prisma.stockMovementReason.findMany({
+      orderBy: { label: "asc" },
+      select: { id: true, label: true },
+    }),
   ]);
   const pmpAchat = weightedAveragePrice(costHistory);
   const pmpVente = weightedAveragePrice(salePriceHistory);
@@ -553,9 +557,7 @@ export default async function PartDetailPage({
                 <Select id="type" name="type" defaultValue="IN">
                   <option value="IN">Entrée (+)</option>
                   <option value="OUT">Sortie (−)</option>
-                  <option value="ADJUSTMENT">
-                    Correction d&apos;inventaire
-                  </option>
+                  <option value="ADJUSTMENT">Inventaire</option>
                 </Select>
               </div>
               <div className="space-y-1.5">
@@ -568,18 +570,42 @@ export default async function PartDetailPage({
                   required
                 />
                 <p className="text-xs text-muted-foreground">
-                  Pour une correction, saisir le stock réel constaté.
+                  <strong>Inventaire</strong> : recale le stock système sur le
+                  stock réel constaté en magasin (après comptage, casse, vol,
+                  erreur passée…). Saisir la quantité réellement observée —
+                  l’écart est calculé automatiquement.
                 </p>
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="reason">Motif</Label>
-                <Input
-                  id="reason"
-                  name="reason"
-                  placeholder="Réception BL n°…, vente, casse…"
-                />
+                {stockReasons.length === 0 ? (
+                  <p className="text-xs text-destructive">
+                    Aucun motif configuré.{" "}
+                    <Link
+                      href="/admin/stock-reasons"
+                      className="underline hover:text-foreground"
+                    >
+                      Ajouter un motif
+                    </Link>
+                  </p>
+                ) : (
+                  <Select id="reason" name="reason" required defaultValue="">
+                    <option value="" disabled>
+                      Sélectionner un motif…
+                    </option>
+                    {stockReasons.map((r) => (
+                      <option key={r.id} value={r.label}>
+                        {r.label}
+                      </option>
+                    ))}
+                  </Select>
+                )}
               </div>
-              <Button type="submit" className="w-full">
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={stockReasons.length === 0}
+              >
                 Enregistrer le mouvement
               </Button>
             </form>
