@@ -13,6 +13,11 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/permissions";
 import { buildReference } from "@/lib/orders";
 import { weightedAveragePrice } from "@/lib/pmp";
+import { orderTotals } from "@/lib/totals";
+
+const round = (n: number) => Math.round(n * 100) / 100;
+const formatEur = (n: number) =>
+  new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" }).format(n);
 
 const MANAGE_ROLES = [Role.ADMIN, Role.MANAGER];
 
@@ -183,6 +188,42 @@ export async function deliverSalesOrder(formData: FormData) {
       if (!order) throw new Error("Commande introuvable.");
       if (order.status !== SalesOrderStatus.CONFIRMED) {
         throw new Error("Seule une commande confirmée peut être livrée.");
+      }
+
+      // Garde-fou crédit client : si une limite est fixée, on refuse la
+      // livraison dès lors que l'encours actuel (commandes facturées non
+      // soldées) + le TTC de cette commande dépasserait la limite.
+      const customer = await tx.customer.findUnique({
+        where: { id: order.customerId },
+        select: {
+          name: true,
+          creditLimit: true,
+          salesOrders: {
+            where: { status: SalesOrderStatus.INVOICED },
+            select: {
+              lines: { select: { quantity: true, unitPriceHt: true, vatRate: true } },
+              payments: { select: { amountTtc: true } },
+            },
+          },
+        },
+      });
+      if (customer?.creditLimit != null) {
+        const encours = round(
+          customer.salesOrders.reduce((sum, o) => {
+            const total = orderTotals(o.lines).ttc;
+            const paid = o.payments.reduce((s, p) => s + p.amountTtc, 0);
+            return sum + Math.max(0, total - paid);
+          }, 0),
+        );
+        const orderTtc = orderTotals(order.lines).ttc;
+        const projected = round(encours + orderTtc);
+        if (projected > customer.creditLimit + 0.01) {
+          throw new Error(
+            `Livraison bloquée : l'encours du client ${customer.name} (${formatEur(encours)}) ` +
+              `et le TTC de cette commande (${formatEur(orderTtc)}) dépasseraient la limite de ` +
+              `${formatEur(customer.creditLimit)}. Encaissez les commandes ouvertes avant de livrer.`,
+          );
+        }
       }
 
       for (const line of order.lines) {
