@@ -29,6 +29,12 @@ const optionalText = z
   .transform((v) => (v === "" ? undefined : v))
   .optional();
 
+const optionalNonNegativeInt = z
+  .string()
+  .transform((v) => v.trim())
+  .transform((v) => (v === "" ? undefined : Number(v)))
+  .pipe(z.number().int().nonnegative().optional());
+
 const createSchema = z.object({
   supplierId: z.string().min(1, "Le fournisseur est obligatoire"),
   expectedAt: optionalDate,
@@ -73,6 +79,7 @@ const lineSchema = z.object({
   partName: optionalText,
   brandId: optionalText,
   categoryId: optionalText,
+  reorderThreshold: optionalNonNegativeInt,
   quantity: z
     .string()
     .trim()
@@ -108,6 +115,7 @@ export async function addPurchaseLine(formData: FormData) {
     partName,
     brandId,
     categoryId,
+    reorderThreshold,
     quantity,
     unitPriceHt,
     vatRate,
@@ -143,6 +151,7 @@ export async function addPurchaseLine(formData: FormData) {
           // Fournisseur par défaut = celui du PO en cours.
           supplierId: order.supplierId,
           vatRate: vatRate / 100,
+          reorderThreshold: reorderThreshold ?? 0,
         },
         select: { id: true },
       });

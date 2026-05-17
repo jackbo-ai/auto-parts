@@ -150,7 +150,7 @@ export function AddPurchaseLineForm({
               ))}
             </Select>
           </div>
-          <div className="space-y-1.5 sm:col-span-2">
+          <div className="space-y-1.5">
             <Label htmlFor="categoryId">
               Catégorie <span className="text-destructive">*</span>
             </Label>
@@ -165,10 +165,21 @@ export function AddPurchaseLineForm({
               ))}
             </Select>
           </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="reorderThreshold">Stock de sécurité</Label>
+            <Input
+              id="reorderThreshold"
+              name="reorderThreshold"
+              type="number"
+              min="0"
+              step="1"
+              placeholder="0"
+            />
+          </div>
           <p className="text-xs text-amber-900 sm:col-span-3">
             Le fournisseur de la commande sera affecté par défaut à la pièce.
-            Vous pourrez ajuster les autres champs (TVA, seuil de réappro,
-            emplacement) depuis la fiche pièce ensuite.
+            Vous pourrez ajuster les autres champs (TVA, emplacement) depuis la
+            fiche pièce ensuite.
           </p>
         </div>
       )}
