@@ -18,14 +18,59 @@ import {
 import { prisma } from "@/lib/prisma";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CategoryFilter } from "@/components/dashboard/category-filter";
 import { DigitalReadout } from "@/components/dashboard/digital-readout";
+import { PeriodFilter } from "@/components/dashboard/period-filter";
+import { SupplierFilter } from "@/components/dashboard/supplier-filter";
 import { formatDateTime, formatEuro, formatNumber } from "@/lib/utils";
 import { orderTotals } from "@/lib/totals";
+import { parsePeriod, periodStart, PERIOD_LABELS } from "@/lib/period";
 import { partsPmpMap, partsPmpTtcMap } from "@/lib/pmp";
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{
+    range?: string;
+    supplier?: string;
+    category?: string;
+  }>;
+}) {
+  const {
+    range: rangeParam,
+    supplier: supplierParam,
+    category: categoryParam,
+  } = await searchParams;
+  const range = parsePeriod(rangeParam);
+  const start = periodStart(range);
+  const supplierId = supplierParam?.trim() || undefined;
+  const categoryId = categoryParam?.trim() || undefined;
+
+  // Filtres date pour chaque source. `start = null` ⇒ pas de borne (tout l'historique).
+  // CA fournisseur : date de réception. CA client / top ventes : date de livraison
+  // (les commandes facturées sont passées par DELIVERED, donc deliveredAt est posé).
+  // Mouvements de stock : date de création.
+  const salesDateFilter = start ? { deliveredAt: { gte: start } } : {};
+  const purchasesDateFilter = start ? { receivedAt: { gte: start } } : {};
+  const movementsDateFilter = start ? { createdAt: { gte: start } } : {};
+
+  // Filtres fournisseur / catégorie sur les pièces. Combinés en un seul prédicat
+  // `part: {...}` réutilisé partout. Sur les ventes : on ne garde que les lignes
+  // dont la pièce match, à la fois pour le `where` (au moins une ligne) et pour
+  // le `select.lines` (n'agréger que ces lignes-là).
+  const partWhere: { supplierId?: string; categoryId?: string } = {};
+  if (supplierId) partWhere.supplierId = supplierId;
+  if (categoryId) partWhere.categoryId = categoryId;
+  const hasPartFilter = Object.keys(partWhere).length > 0;
+  const partFilter = hasPartFilter ? partWhere : undefined;
+  const linesPartFilter = partFilter
+    ? { some: { part: partFilter } }
+    : undefined;
+
   const [
     parts,
+    suppliers,
+    categories,
     suppliersCount,
     categoriesCount,
     recentMovements,
@@ -36,7 +81,7 @@ export default async function DashboardPage() {
     topSoldGroups,
   ] = await Promise.all([
     prisma.part.findMany({
-      where: { active: true },
+      where: { active: true, ...(partFilter ?? {}) },
       select: {
         id: true,
         reference: true,
@@ -45,9 +90,21 @@ export default async function DashboardPage() {
         reorderThreshold: true,
       },
     }),
+    prisma.supplier.findMany({
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
+    }),
+    prisma.category.findMany({
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
+    }),
     prisma.supplier.count(),
     prisma.category.count(),
     prisma.stockMovement.findMany({
+      where: {
+        ...movementsDateFilter,
+        ...(partFilter ? { part: partFilter } : {}),
+      },
       orderBy: { createdAt: "desc" },
       take: 8,
       include: {
@@ -55,18 +112,36 @@ export default async function DashboardPage() {
         createdBy: { select: { name: true } },
       },
     }),
-    // CA fournisseur : commandes d'achat réceptionnées.
+    // CA fournisseur : commandes d'achat réceptionnées sur la période. Filtre
+    // supplier au niveau commande ; filtre catégorie au niveau des lignes
+    // (au moins une ligne avec une pièce de la catégorie).
     prisma.purchaseOrder.findMany({
-      where: { status: PurchaseOrderStatus.RECEIVED },
-      select: { lines: { select: { quantity: true, unitPriceHt: true, vatRate: true } } },
-    }),
-    // CA client : commandes livrées ou facturées.
-    prisma.salesOrder.findMany({
       where: {
-        status: { in: [SalesOrderStatus.DELIVERED, SalesOrderStatus.INVOICED] },
+        status: PurchaseOrderStatus.RECEIVED,
+        ...purchasesDateFilter,
+        ...(supplierId ? { supplierId } : {}),
+        ...(categoryId
+          ? { lines: { some: { part: { categoryId } } } }
+          : {}),
       },
       select: {
         lines: {
+          where: categoryId ? { part: { categoryId } } : undefined,
+          select: { quantity: true, unitPriceHt: true, vatRate: true },
+        },
+      },
+    }),
+    // CA client : commandes livrées ou facturées sur la période, lignes
+    // restreintes au fournisseur / catégorie sélectionnés le cas échéant.
+    prisma.salesOrder.findMany({
+      where: {
+        status: { in: [SalesOrderStatus.DELIVERED, SalesOrderStatus.INVOICED] },
+        ...salesDateFilter,
+        ...(linesPartFilter ? { lines: linesPartFilter } : {}),
+      },
+      select: {
+        lines: {
+          where: partFilter ? { part: partFilter } : undefined,
           select: {
             quantity: true,
             unitPriceHt: true,
@@ -85,13 +160,22 @@ export default async function DashboardPage() {
           status: {
             in: [SalesOrderStatus.DELIVERED, SalesOrderStatus.INVOICED],
           },
+          ...salesDateFilter,
         },
+        ...(partFilter ? { part: partFilter } : {}),
       },
       _sum: { quantity: true },
       orderBy: { _sum: { quantity: "desc" } },
       take: 5,
     }),
   ]);
+
+  const selectedSupplier = supplierId
+    ? suppliers.find((s) => s.id === supplierId)
+    : undefined;
+  const selectedCategory = categoryId
+    ? categories.find((c) => c.id === categoryId)
+    : undefined;
 
   const topSoldParts = topSoldGroups.length
     ? await prisma.part.findMany({
@@ -230,17 +314,30 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Tableau de bord</h1>
-        <p className="text-sm text-muted-foreground">
-          {formatNumber(parts.length)} pièces · {formatNumber(categoriesCount)}{" "}
-          catégories
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold">Tableau de bord</h1>
+          <p className="text-sm text-muted-foreground">
+            {formatNumber(parts.length)} pièces ·{" "}
+            {formatNumber(categoriesCount)} catégories
+            {selectedSupplier ? ` · ${selectedSupplier.name}` : ""}
+            {selectedCategory ? ` · ${selectedCategory.name}` : ""}
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <SupplierFilter suppliers={suppliers} current={supplierId ?? ""} />
+          <CategoryFilter categories={categories} current={categoryId ?? ""} />
+          <PeriodFilter
+            current={range}
+            preserve={{ supplier: supplierId, category: categoryId }}
+          />
+        </div>
       </div>
 
       <div className="space-y-2">
         <h2 className="text-sm font-medium text-muted-foreground">
-          Indicateurs financiers
+          Indicateurs financiers ·{" "}
+          <span className="text-foreground">{PERIOD_LABELS[range]}</span>
         </h2>
         <div className="grid gap-4 sm:grid-cols-3">
           {financialKpis.map(({ label, value, icon: Icon, href, tone }) => (
@@ -280,6 +377,9 @@ export default async function DashboardPage() {
             <CardTitle className="flex items-center gap-2 text-base">
               <TrendingUp className="h-4 w-4 text-emerald-600" />
               Top 5 articles vendus
+              <span className="ml-auto text-xs font-normal text-muted-foreground">
+                {PERIOD_LABELS[range]}
+              </span>
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -316,6 +416,9 @@ export default async function DashboardPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
               Derniers mouvements de stock
+              <span className="ml-auto text-xs font-normal text-muted-foreground">
+                {PERIOD_LABELS[range]}
+              </span>
             </CardTitle>
           </CardHeader>
           <CardContent>
