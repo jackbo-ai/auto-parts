@@ -19,12 +19,13 @@ import { prisma } from "@/lib/prisma";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CategoryFilter } from "@/components/dashboard/category-filter";
+import { CustomRangeInput } from "@/components/dashboard/custom-range-input";
 import { DigitalReadout } from "@/components/dashboard/digital-readout";
 import { PeriodFilter } from "@/components/dashboard/period-filter";
 import { SupplierFilter } from "@/components/dashboard/supplier-filter";
 import { formatDateTime, formatEuro, formatNumber } from "@/lib/utils";
 import { orderTotals } from "@/lib/totals";
-import { parsePeriod, periodStart, PERIOD_LABELS } from "@/lib/period";
+import { describePeriod, parsePeriod, periodBounds } from "@/lib/period";
 import { partsPmpMap, partsPmpTtcMap } from "@/lib/pmp";
 
 export default async function DashboardPage({
@@ -34,25 +35,37 @@ export default async function DashboardPage({
     range?: string;
     supplier?: string;
     category?: string;
+    from?: string;
+    to?: string;
   }>;
 }) {
   const {
     range: rangeParam,
     supplier: supplierParam,
     category: categoryParam,
+    from: fromParam,
+    to: toParam,
   } = await searchParams;
   const range = parsePeriod(rangeParam);
-  const start = periodStart(range);
+  const bounds = periodBounds(range, { from: fromParam, to: toParam });
+  const periodLabel = describePeriod(range, bounds);
   const supplierId = supplierParam?.trim() || undefined;
   const categoryId = categoryParam?.trim() || undefined;
 
-  // Filtres date pour chaque source. `start = null` ⇒ pas de borne (tout l'historique).
+  // Filtres date pour chaque source. `start`/`end` null ⇒ borne ouverte.
   // CA fournisseur : date de réception. CA client / top ventes : date de livraison
   // (les commandes facturées sont passées par DELIVERED, donc deliveredAt est posé).
   // Mouvements de stock : date de création.
-  const salesDateFilter = start ? { deliveredAt: { gte: start } } : {};
-  const purchasesDateFilter = start ? { receivedAt: { gte: start } } : {};
-  const movementsDateFilter = start ? { createdAt: { gte: start } } : {};
+  const dateRange: { gte?: Date; lte?: Date } | undefined =
+    bounds.start || bounds.end
+      ? {
+          ...(bounds.start ? { gte: bounds.start } : {}),
+          ...(bounds.end ? { lte: bounds.end } : {}),
+        }
+      : undefined;
+  const salesDateFilter = dateRange ? { deliveredAt: dateRange } : {};
+  const purchasesDateFilter = dateRange ? { receivedAt: dateRange } : {};
+  const movementsDateFilter = dateRange ? { createdAt: dateRange } : {};
 
   // Filtres fournisseur / catégorie sur les pièces. Combinés en un seul prédicat
   // `part: {...}` réutilisé partout. Sur les ventes : on ne garde que les lignes
@@ -331,13 +344,18 @@ export default async function DashboardPage({
             current={range}
             preserve={{ supplier: supplierId, category: categoryId }}
           />
+          <CustomRangeInput
+            from={fromParam ?? ""}
+            to={toParam ?? ""}
+            active={range === "custom"}
+          />
         </div>
       </div>
 
       <div className="space-y-2">
         <h2 className="text-sm font-medium text-muted-foreground">
           Indicateurs financiers ·{" "}
-          <span className="text-foreground">{PERIOD_LABELS[range]}</span>
+          <span className="text-foreground">{periodLabel}</span>
         </h2>
         <div className="grid gap-4 sm:grid-cols-3">
           {financialKpis.map(({ label, value, icon: Icon, href, tone }) => (
@@ -378,7 +396,7 @@ export default async function DashboardPage({
               <TrendingUp className="h-4 w-4 text-emerald-600" />
               Top 5 articles vendus
               <span className="ml-auto text-xs font-normal text-muted-foreground">
-                {PERIOD_LABELS[range]}
+                {periodLabel}
               </span>
             </CardTitle>
           </CardHeader>
@@ -417,7 +435,7 @@ export default async function DashboardPage({
             <CardTitle className="flex items-center gap-2 text-base">
               Derniers mouvements de stock
               <span className="ml-auto text-xs font-normal text-muted-foreground">
-                {PERIOD_LABELS[range]}
+                {periodLabel}
               </span>
             </CardTitle>
           </CardHeader>

@@ -2,7 +2,7 @@ import Link from "next/link";
 import {
   DEFAULT_PERIOD,
   PERIOD_LABELS,
-  PERIOD_RANGES,
+  PRESET_RANGES,
   type PeriodRange,
 } from "@/lib/period";
 import { cn } from "@/lib/utils";
@@ -20,7 +20,7 @@ export function PeriodFilter({
       aria-label="Période"
       className="inline-flex items-center gap-1 rounded-md border bg-card p-1 shadow-sm"
     >
-      {PERIOD_RANGES.map((range) => {
+      {PRESET_RANGES.map((range) => {
         const active = range === current;
         const qs = new URLSearchParams();
         if (range !== DEFAULT_PERIOD) qs.set("range", range);
