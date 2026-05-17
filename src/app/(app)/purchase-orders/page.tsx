@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CustomRangeInput } from "@/components/dashboard/custom-range-input";
 import { PeriodFilter } from "@/components/dashboard/period-filter";
+import { SupplierFilter } from "@/components/dashboard/supplier-filter";
 import { formatDate, formatEuro } from "@/lib/utils";
 import { describePeriod, parsePeriod, periodBounds } from "@/lib/period";
 import { orderTotals } from "@/lib/totals";
@@ -72,15 +73,25 @@ function OrdersTable({ orders }: { orders: PurchaseOrderRow[] }) {
 export default async function PurchaseOrdersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ range?: string; from?: string; to?: string }>;
+  searchParams: Promise<{
+    range?: string;
+    from?: string;
+    to?: string;
+    supplier?: string;
+  }>;
 }) {
   const me = await requireUser();
   const canManage = canManageOrders(me.role);
-  const { range: rangeParam, from: fromParam, to: toParam } =
-    await searchParams;
+  const {
+    range: rangeParam,
+    from: fromParam,
+    to: toParam,
+    supplier: supplierParam,
+  } = await searchParams;
   const range = parsePeriod(rangeParam);
   const bounds = periodBounds(range, { from: fromParam, to: toParam });
   const periodLabel = describePeriod(range, bounds);
+  const supplierId = supplierParam?.trim() || undefined;
 
   const orderDateFilter: { gte?: Date; lte?: Date } | undefined =
     bounds.start || bounds.end
@@ -90,14 +101,26 @@ export default async function PurchaseOrdersPage({
         }
       : undefined;
 
-  const orders = await prisma.purchaseOrder.findMany({
-    where: orderDateFilter ? { orderDate: orderDateFilter } : undefined,
-    orderBy: { orderDate: "desc" },
-    include: {
-      supplier: { select: { name: true } },
-      lines: true,
-    },
-  });
+  const [orders, suppliers] = await Promise.all([
+    prisma.purchaseOrder.findMany({
+      where: {
+        ...(orderDateFilter ? { orderDate: orderDateFilter } : {}),
+        ...(supplierId ? { supplierId } : {}),
+      },
+      orderBy: { orderDate: "desc" },
+      include: {
+        supplier: { select: { name: true } },
+        lines: true,
+      },
+    }),
+    prisma.supplier.findMany({
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
+    }),
+  ]);
+  const selectedSupplier = supplierId
+    ? suppliers.find((s) => s.id === supplierId)
+    : undefined;
 
   const activeOrders = orders.filter(
     (o) => o.status !== PurchaseOrderStatus.CANCELLED,
@@ -114,10 +137,16 @@ export default async function PurchaseOrdersPage({
           <p className="text-sm text-muted-foreground">
             {orders.length} commande{orders.length > 1 ? "s" : ""} ·{" "}
             <span className="text-foreground">{periodLabel}</span>
+            {selectedSupplier ? ` · ${selectedSupplier.name}` : ""}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <PeriodFilter current={range} basePath="/purchase-orders" />
+          <SupplierFilter suppliers={suppliers} current={supplierId ?? ""} />
+          <PeriodFilter
+            current={range}
+            basePath="/purchase-orders"
+            preserve={{ supplier: supplierId }}
+          />
           <CustomRangeInput
             from={fromParam ?? ""}
             to={toParam ?? ""}
