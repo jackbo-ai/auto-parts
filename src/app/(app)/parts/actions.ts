@@ -139,6 +139,40 @@ export async function setPartActive(formData: FormData) {
   revalidatePath("/");
 }
 
+// Remise à zéro du stock : crée un mouvement d'inventaire qui consomme tout le
+// stock courant et fige le compteur à 0. Aucun effet si le stock est déjà nul.
+export async function resetPartStock(formData: FormData) {
+  const user = await requireRole(MANAGE_ROLES);
+  const id = String(formData.get("id") ?? "");
+  if (!id) throw new Error("Pièce introuvable.");
+
+  await prisma.$transaction(async (tx) => {
+    const part = await tx.part.findUnique({
+      where: { id },
+      select: { stockQty: true },
+    });
+    if (!part) throw new Error("Pièce introuvable.");
+    if (part.stockQty === 0) return;
+
+    await tx.stockMovement.create({
+      data: {
+        partId: id,
+        type: "ADJUSTMENT",
+        quantity: -part.stockQty,
+        resulting: 0,
+        reason: "Remise à zéro",
+        createdById: user.id,
+      },
+    });
+    await tx.part.update({ where: { id }, data: { stockQty: 0 } });
+  });
+
+  revalidatePath("/parts");
+  revalidatePath(`/parts/${id}`);
+  revalidatePath("/stock");
+  revalidatePath("/");
+}
+
 export async function deletePart(formData: FormData) {
   await requireRole(MANAGE_ROLES);
   const id = String(formData.get("id") ?? "");

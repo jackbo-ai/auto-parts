@@ -1,14 +1,16 @@
 import Link from "next/link";
-import { Plus, Search } from "lucide-react";
+import { Plus, RotateCcw, Search, Trash2 } from "lucide-react";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireUser, canManageCatalog } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
+import { ConfirmSubmit } from "@/components/confirm-submit";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { formatEuro, formatNumber } from "@/lib/utils";
 import { partsPmpMap, partsSalePmpMap } from "@/lib/pmp";
+import { deletePart, resetPartStock } from "./actions";
 
 function stockBadge(qty: number, threshold: number) {
   if (qty <= 0) return "border-destructive/30 bg-destructive/10 text-destructive";
@@ -28,6 +30,7 @@ export default async function PartsPage({
   }>;
 }) {
   const me = await requireUser();
+  const canManage = canManageCatalog(me.role);
   const params = await searchParams;
   const q = params.q?.trim() ?? "";
   const category = params.category?.trim() ?? "";
@@ -72,7 +75,7 @@ export default async function PartsPage({
       <div className="flex items-center justify-between gap-4">
         <h1 className="text-2xl font-semibold">Catalogue</h1>
         <div className="flex gap-2">
-          {canManageCatalog(me.role) && (
+          {canManage && (
             <>
               <Button asChild variant="outline" size="sm">
                 <Link href="/admin/categories">Catégories</Link>
@@ -215,13 +218,14 @@ export default async function PartsPage({
               <th className="px-4 py-3">PMP vente HT</th>
               <th className="px-4 py-3">PMP achat HT</th>
               <th className="px-4 py-3">Stock</th>
+              {canManage && <th className="px-4 py-3 text-right">Actions</th>}
             </tr>
           </thead>
           <tbody>
             {parts.length === 0 && (
               <tr>
                 <td
-                  colSpan={6}
+                  colSpan={canManage ? 7 : 6}
                   className="px-4 py-12 text-center text-muted-foreground"
                 >
                   Aucune pièce.
@@ -275,6 +279,35 @@ export default async function PartsPage({
                     </span>
                   </Badge>
                 </td>
+                {canManage && (
+                  <td className="px-4 py-3">
+                    <div className="flex items-center justify-end gap-1">
+                      <form action={resetPartStock}>
+                        <input type="hidden" name="id" value={p.id} />
+                        <ConfirmSubmit
+                          variant="ghost"
+                          size="sm"
+                          disabled={p.stockQty === 0}
+                          message={`Remettre le stock de ${p.reference} à 0 ? Un mouvement d'inventaire sera enregistré.`}
+                        >
+                          <RotateCcw className="h-4 w-4" />
+                          <span className="sr-only">Remettre à zéro</span>
+                        </ConfirmSubmit>
+                      </form>
+                      <form action={deletePart}>
+                        <input type="hidden" name="id" value={p.id} />
+                        <ConfirmSubmit
+                          variant="ghost"
+                          size="sm"
+                          message={`Supprimer définitivement ${p.reference} ? Les mouvements et compatibilités liés seront supprimés.`}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                          <span className="sr-only">Supprimer</span>
+                        </ConfirmSubmit>
+                      </form>
+                    </div>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
