@@ -50,11 +50,12 @@ export default async function PurchaseOrderDetailPage({
   const isOrdered = order.status === PurchaseOrderStatus.ORDERED;
 
   // Pour le formulaire d'ajout de ligne : le PU achat est pré-rempli avec le
-  // PMP achat en cours de la pièce (le prix de référence n'existe plus).
-  const parts =
+  // PMP achat en cours de la pièce. On charge aussi marques + catégories pour
+  // permettre la création d'une pièce à la volée si la référence est inconnue.
+  const formData =
     canManage && isDraft
       ? await (async () => {
-          const [rows, pmpAchatMap] = await Promise.all([
+          const [rows, pmpAchatMap, brands, categories] = await Promise.all([
             prisma.part.findMany({
               where: { active: true },
               orderBy: { reference: "asc" },
@@ -66,13 +67,28 @@ export default async function PurchaseOrderDetailPage({
               },
             }),
             partsPmpMap(),
+            prisma.brand.findMany({
+              orderBy: { name: "asc" },
+              select: { id: true, name: true },
+            }),
+            prisma.category.findMany({
+              orderBy: { name: "asc" },
+              select: { id: true, name: true },
+            }),
           ]);
-          return rows.map((p) => ({
-            ...p,
-            pmpAchat: pmpAchatMap.get(p.id) ?? null,
-          }));
+          return {
+            parts: rows.map((p) => ({
+              ...p,
+              pmpAchat: pmpAchatMap.get(p.id) ?? null,
+            })),
+            brands,
+            categories,
+          };
         })()
-      : [];
+      : null;
+  const parts = formData?.parts ?? [];
+  const brands = formData?.brands ?? [];
+  const categories = formData?.categories ?? [];
 
   return (
     <div className="mx-auto max-w-4xl space-y-5">
@@ -257,14 +273,17 @@ export default async function PurchaseOrderDetailPage({
       {canManage && isDraft && (
         <section className="space-y-2 rounded-lg border bg-card p-4">
           <h2 className="text-sm font-medium">Ajouter une ligne</h2>
-          {parts.length === 0 ? (
+          {brands.length === 0 || categories.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              Aucune pièce active au catalogue.
+              Au moins une marque et une catégorie doivent être configurées
+              pour permettre la création de pièces.
             </p>
           ) : (
             <AddPurchaseLineForm
               purchaseOrderId={order.id}
               parts={parts}
+              brands={brands}
+              categories={categories}
               action={addPurchaseLine}
             />
           )}

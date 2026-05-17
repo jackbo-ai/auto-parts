@@ -62,9 +62,17 @@ export async function createPurchaseOrder(formData: FormData) {
   redirect(`/purchase-orders/${order.id}`);
 }
 
+// Saisie d'une ligne d'achat : on accepte soit un partId direct (sélection d'une
+// pièce existante), soit une référence libre. Si la référence ne correspond à
+// aucune pièce, on crée la pièce à la volée à partir des champs partName /
+// brandId / categoryId. Pratique pour saisir un BL fournisseur sans avoir à
+// initialiser le catalogue en amont.
 const lineSchema = z.object({
   purchaseOrderId: z.string().min(1),
-  partId: z.string().min(1, "La pièce est obligatoire"),
+  partReference: z.string().trim().min(1, "La référence est obligatoire"),
+  partName: optionalText,
+  brandId: optionalText,
+  categoryId: optionalText,
   quantity: z
     .string()
     .trim()
@@ -95,27 +103,64 @@ export async function addPurchaseLine(formData: FormData) {
   if (!parsed.success) {
     failTo(backPath, parsed.error.issues[0]?.message ?? "Formulaire invalide");
   }
-  const { partId, quantity, unitPriceHt, vatRate } = parsed.data;
+  const {
+    partReference,
+    partName,
+    brandId,
+    categoryId,
+    quantity,
+    unitPriceHt,
+    vatRate,
+  } = parsed.data;
 
   const order = await prisma.purchaseOrder.findUnique({
     where: { id: purchaseOrderId },
-    select: { status: true },
+    select: { status: true, supplierId: true },
   });
   if (!order) failTo(backPath, "Commande introuvable.");
   if (order.status !== PurchaseOrderStatus.DRAFT) {
     failTo(backPath, "Les lignes ne sont modifiables qu'en brouillon.");
   }
 
-  await prisma.purchaseOrderLine.create({
-    data: {
-      purchaseOrderId,
-      partId,
-      quantity,
-      unitPriceHt,
-      vatRate: vatRate / 100,
-    },
+  await prisma.$transaction(async (tx) => {
+    let part = await tx.part.findUnique({
+      where: { reference: partReference },
+      select: { id: true },
+    });
+    if (!part) {
+      if (!partName || !brandId || !categoryId) {
+        failTo(
+          backPath,
+          `La pièce "${partReference}" n'existe pas — désignation, marque et catégorie sont nécessaires pour la créer.`,
+        );
+      }
+      part = await tx.part.create({
+        data: {
+          reference: partReference,
+          name: partName,
+          brandId,
+          categoryId,
+          // Fournisseur par défaut = celui du PO en cours.
+          supplierId: order.supplierId,
+          vatRate: vatRate / 100,
+        },
+        select: { id: true },
+      });
+    }
+
+    await tx.purchaseOrderLine.create({
+      data: {
+        purchaseOrderId,
+        partId: part.id,
+        quantity,
+        unitPriceHt,
+        vatRate: vatRate / 100,
+      },
+    });
   });
+
   revalidatePath(`/purchase-orders/${purchaseOrderId}`);
+  revalidatePath("/parts");
 }
 
 export async function removePurchaseLine(formData: FormData) {
