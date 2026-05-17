@@ -3,7 +3,6 @@ import {
   Banknote,
   Boxes,
   LayoutDashboard,
-  Package,
   Receipt,
   Settings,
   ShoppingCart,
@@ -19,7 +18,6 @@ const NAV = [
   { href: "/purchase-orders", label: "Achats", icon: ShoppingCart },
   { href: "/sales-orders", label: "Ventes", icon: Receipt },
   { href: "/encaissements", label: "Encaissements", icon: Banknote },
-  { href: "/parts", label: "Catalogue", icon: Package },
 ];
 
 export function Header({ user }: { user: SessionUser }) {

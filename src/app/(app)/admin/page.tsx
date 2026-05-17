@@ -60,6 +60,13 @@ export default async function AdminPage() {
       meta: `${supplierCount} fournisseur${supplierCount > 1 ? "s" : ""}`,
     },
     {
+      href: "/parts",
+      label: "Catalogue",
+      description: "Liste des pièces actives, prix, seuils et stock",
+      icon: Package,
+      meta: `${partCount} pièce${partCount > 1 ? "s" : ""}`,
+    },
+    {
       href: "/admin/articles",
       label: "Initialisation base articles",
       description: "Import d'un fichier TecDoc (référence + désignation)",
