@@ -14,7 +14,7 @@ import {
 import type { Prisma } from "@prisma/client";
 import { StockMovementType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { requireUser } from "@/lib/permissions";
+import { canAdjustStock, requireUser } from "@/lib/permissions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,7 +42,8 @@ export default async function StockPage({
     movType?: string;
   }>;
 }) {
-  await requireUser();
+  const me = await requireUser();
+  const canAdjust = canAdjustStock(me.role);
   const params = await searchParams;
 
   const [parts, pmpAchatMap, inactiveCount, stockReasons] =
@@ -226,7 +227,9 @@ export default async function StockPage({
               <Select id="mov-type" name="type" defaultValue="IN">
                 <option value="IN">Entrée (+)</option>
                 <option value="OUT">Sortie (−)</option>
-                <option value="ADJUSTMENT">Inventaire</option>
+                {canAdjust && (
+                  <option value="ADJUSTMENT">Inventaire</option>
+                )}
               </Select>
             </div>
             <div className="space-y-1.5">
@@ -254,12 +257,14 @@ export default async function StockPage({
             </div>
             <div className="sm:col-span-2 lg:col-span-5">
               <Button type="submit">Enregistrer le mouvement</Button>
-              <p className="mt-1 text-xs text-muted-foreground">
-                <strong>Inventaire</strong> : recale le stock système sur le
-                stock réel constaté en magasin (après comptage, casse, vol,
-                erreur passée…). Saisir la quantité réellement observée — l’écart
-                est calculé automatiquement.
-              </p>
+              {canAdjust && (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  <strong>Inventaire</strong> : recale le stock système sur le
+                  stock réel constaté en magasin (après comptage, casse, vol,
+                  erreur passée…). Saisir la quantité réellement observée — l’écart
+                  est calculé automatiquement.
+                </p>
+              )}
             </div>
           </form>
         )}

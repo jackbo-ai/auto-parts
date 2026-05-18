@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { StockMovementType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { requireUser } from "@/lib/permissions";
+import { canAdjustStock, requireUser } from "@/lib/permissions";
 
 const movementSchema = z.object({
   // partId est posé en hidden depuis la fiche pièce ; partRef est saisi via
@@ -31,6 +31,11 @@ export async function recordStockMovement(formData: FormData) {
     throw new Error(parsed.error.issues[0]?.message ?? "Formulaire invalide");
   }
   const { type, quantity, reason } = parsed.data;
+  if (type === StockMovementType.ADJUSTMENT && !canAdjustStock(user.role)) {
+    throw new Error(
+      "Seul un administrateur ou un gestionnaire peut effectuer un inventaire.",
+    );
+  }
   let resolvedPartId = parsed.data.partId;
   if (!resolvedPartId && parsed.data.partRef) {
     const match = await prisma.part.findFirst({

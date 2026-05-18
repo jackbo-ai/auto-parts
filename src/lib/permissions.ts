@@ -58,6 +58,11 @@ export const canManageCatalog = (role: Role) =>
 export const canMoveStock = (role: Role) =>
   role === Role.ADMIN || role === Role.MANAGER || role === Role.STAFF;
 
+// Inventaire (ADJUSTMENT) : recale le stock système — réservé Admin/Manager
+// car un Staff ne doit pas pouvoir effacer un écart sans validation.
+export const canAdjustStock = (role: Role) =>
+  role === Role.ADMIN || role === Role.MANAGER;
+
 // Commandes (achat et vente) : Admin + Manager créent et pilotent les
 // commandes. Staff est en lecture seule.
 export const canManageOrders = (role: Role) =>

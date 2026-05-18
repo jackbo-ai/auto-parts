@@ -10,7 +10,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
-import { requireUser, canManageCatalog } from "@/lib/permissions";
+import { canAdjustStock, requireUser, canManageCatalog } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -92,6 +92,7 @@ export default async function PartDetailPage({
   if (!part) notFound();
 
   const canManage = canManageCatalog(me.role);
+  const canAdjust = canAdjustStock(me.role);
   const lowStock = part.stockQty <= part.reorderThreshold;
 
   // Ni le coût d'achat ni le prix de vente ne sont figés : on les déduit de
@@ -634,7 +635,9 @@ export default async function PartDetailPage({
                 <Select id="type" name="type" defaultValue="IN">
                   <option value="IN">Entrée (+)</option>
                   <option value="OUT">Sortie (−)</option>
-                  <option value="ADJUSTMENT">Inventaire</option>
+                  {canAdjust && (
+                    <option value="ADJUSTMENT">Inventaire</option>
+                  )}
                 </Select>
               </div>
               <div className="space-y-1.5">
@@ -646,12 +649,14 @@ export default async function PartDetailPage({
                   min="1"
                   required
                 />
-                <p className="text-xs text-muted-foreground">
-                  <strong>Inventaire</strong> : recale le stock système sur le
-                  stock réel constaté en magasin (après comptage, casse, vol,
-                  erreur passée…). Saisir la quantité réellement observée —
-                  l’écart est calculé automatiquement.
-                </p>
+                {canAdjust && (
+                  <p className="text-xs text-muted-foreground">
+                    <strong>Inventaire</strong> : recale le stock système sur le
+                    stock réel constaté en magasin (après comptage, casse, vol,
+                    erreur passée…). Saisir la quantité réellement observée —
+                    l’écart est calculé automatiquement.
+                  </p>
+                )}
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="reason">Motif</Label>
