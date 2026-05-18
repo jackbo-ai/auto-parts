@@ -64,7 +64,14 @@ export default async function CustomerDetailPage({
         <ArrowLeft className="h-4 w-4" />
         Retour aux clients
       </Link>
-      <h1 className="text-2xl font-semibold">{customer.name}</h1>
+      <div className="flex flex-wrap items-baseline gap-3">
+        <h1 className="text-2xl font-semibold">{customer.name}</h1>
+        {customer.accountNumber && (
+          <span className="font-mono text-sm text-muted-foreground">
+            {customer.accountNumber}
+          </span>
+        )}
+      </div>
 
       <section
         className={`rounded-lg border p-4 ${

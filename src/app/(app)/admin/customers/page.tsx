@@ -61,7 +61,14 @@ export default async function CustomersPage() {
               href={`/admin/customers/${c.id}`}
               className="rounded-lg border bg-card p-4 hover:bg-accent/40"
             >
-              <div className="font-medium">{c.name}</div>
+              <div className="flex items-baseline justify-between gap-2">
+                <div className="font-medium">{c.name}</div>
+                {c.accountNumber && (
+                  <span className="font-mono text-xs text-muted-foreground">
+                    {c.accountNumber}
+                  </span>
+                )}
+              </div>
               <div className="mt-1 space-y-0.5 text-sm text-muted-foreground">
                 {c.email && (
                   <div className="flex items-center gap-1.5">

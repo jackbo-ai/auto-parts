@@ -5,22 +5,22 @@ import { requireRole } from "@/lib/permissions";
 import { Role } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { createSalesOrder } from "../actions";
+import { CustomerPicker } from "./customer-picker";
 
 export default async function NewSalesOrderPage({
   searchParams,
 }: {
   searchParams: Promise<{ error?: string }>;
 }) {
-  const me = await requireRole([Role.ADMIN, Role.MANAGER]);
+  await requireRole([Role.ADMIN, Role.MANAGER]);
   const { error } = await searchParams;
 
   const customers = await prisma.customer.findMany({
     orderBy: { name: "asc" },
+    select: { id: true, name: true, accountNumber: true },
   });
-  const isAdmin = me.role === Role.ADMIN;
 
   return (
     <div className="mx-auto max-w-xl space-y-4">
@@ -39,49 +39,28 @@ export default async function NewSalesOrderPage({
         </p>
       )}
 
-      {customers.length === 0 ? (
-        <div className="rounded-lg border bg-card px-4 py-8 text-center text-sm text-muted-foreground">
-          Aucun client enregistré.{" "}
-          {isAdmin ? (
-            <Link
-              href="/admin/customers"
-              className="text-primary hover:underline"
-            >
-              Ajoutez-en un d&apos;abord.
-            </Link>
-          ) : (
-            <span>Contactez un administrateur pour en ajouter un.</span>
-          )}
+      <form
+        action={createSalesOrder}
+        className="space-y-4 rounded-lg border bg-card p-4"
+      >
+        <CustomerPicker customers={customers} />
+        <div className="space-y-1.5">
+          <Label htmlFor="notes">Notes</Label>
+          <Textarea
+            id="notes"
+            name="notes"
+            placeholder="Conditions, contact…"
+          />
         </div>
-      ) : (
-        <form
-          action={createSalesOrder}
-          className="space-y-4 rounded-lg border bg-card p-4"
-        >
-          <div className="space-y-1.5">
-            <Label htmlFor="customerId">Client</Label>
-            <Select id="customerId" name="customerId" required>
-              <option value="">— Choisir —</option>
-              {customers.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </Select>
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="notes">Notes</Label>
-            <Textarea id="notes" name="notes" placeholder="Conditions, contact…" />
-          </div>
-          <p className="text-xs text-muted-foreground">
-            La commande est créée en brouillon. Vous ajouterez les lignes
-            (pièces) à l&apos;étape suivante.
-          </p>
-          <div className="flex justify-end">
-            <Button type="submit">Créer le brouillon</Button>
-          </div>
-        </form>
-      )}
+        <p className="text-xs text-muted-foreground">
+          La commande est créée en brouillon. Vous ajouterez les lignes
+          (pièces) à l&apos;étape suivante. Un nouveau client renseigné sera
+          créé en même temps.
+        </p>
+        <div className="flex justify-end">
+          <Button type="submit">Créer le brouillon</Button>
+        </div>
+      </form>
     </div>
   );
 }

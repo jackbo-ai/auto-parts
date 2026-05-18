@@ -14,6 +14,7 @@ import { requireRole } from "@/lib/permissions";
 import { buildReference } from "@/lib/orders";
 import { weightedAveragePrice } from "@/lib/pmp";
 import { orderTotals } from "@/lib/totals";
+import { nextCustomerAccountNumber } from "@/lib/customer-account";
 
 const round = (n: number) => Math.round(n * 100) / 100;
 const formatEur = (n: number) =>
@@ -35,7 +36,9 @@ const optionalText = z
   .optional();
 
 const createSchema = z.object({
-  customerId: z.string().min(1, "Le client est obligatoire"),
+  customerName: z.string().trim().min(1, "Le nom du client est obligatoire"),
+  customerEmail: optionalText,
+  customerPhone: optionalText,
   notes: optionalText,
 });
 
@@ -48,20 +51,43 @@ export async function createSalesOrder(formData: FormData) {
       parsed.error.issues[0]?.message ?? "Formulaire invalide",
     );
   }
+  const { customerName, customerEmail, customerPhone, notes } = parsed.data;
 
   const order = await prisma.$transaction(async (tx) => {
+    // Résolution du client : match exact (insensible à la casse) sur le nom,
+    // sinon création à la volée avec un numéro de compte auto-attribué.
+    const existing = await tx.customer.findFirst({
+      where: { name: { equals: customerName } },
+      select: { id: true },
+    });
+    let customerId = existing?.id;
+    if (!customerId) {
+      const accountNumber = await nextCustomerAccountNumber(tx);
+      const created = await tx.customer.create({
+        data: {
+          name: customerName,
+          email: customerEmail ?? null,
+          phone: customerPhone ?? null,
+          accountNumber,
+        },
+        select: { id: true },
+      });
+      customerId = created.id;
+    }
+
     const count = await tx.salesOrder.count();
     return tx.salesOrder.create({
       data: {
         reference: buildReference("VTE", count),
-        customerId: parsed.data.customerId,
-        notes: parsed.data.notes,
+        customerId,
+        notes,
         createdById: user.id,
       },
     });
   });
 
   revalidatePath("/sales-orders");
+  revalidatePath("/admin/customers");
   redirect(`/sales-orders/${order.id}`);
 }
 

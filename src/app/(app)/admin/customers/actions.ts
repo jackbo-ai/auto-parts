@@ -6,6 +6,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/permissions";
 import { Role } from "@prisma/client";
+import { nextCustomerAccountNumber } from "@/lib/customer-account";
 
 const MANAGE_ROLES = [Role.ADMIN];
 
@@ -44,11 +45,15 @@ export async function createCustomer(formData: FormData) {
     throw new Error(parsed.error.issues[0]?.message ?? "Formulaire invalide");
   }
 
-  await prisma.customer.create({
-    data: {
-      ...parsed.data,
-      creditLimit: parsed.data.creditLimit ?? null,
-    },
+  await prisma.$transaction(async (tx) => {
+    const accountNumber = await nextCustomerAccountNumber(tx);
+    await tx.customer.create({
+      data: {
+        ...parsed.data,
+        accountNumber,
+        creditLimit: parsed.data.creditLimit ?? null,
+      },
+    });
   });
   revalidatePath("/admin/customers");
 }
