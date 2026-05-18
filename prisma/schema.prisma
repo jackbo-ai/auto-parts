@@ -182,6 +182,8 @@ model PurchaseOrder {
   expectedAt  DateTime?
   receivedAt  DateTime?
   notes       String?
+  // Plaque d'immatriculation du véhicule concerné (saisie libre, optionnelle).
+  licensePlate String?
   createdById String?
   createdBy   User?               @relation(fields: [createdById], references: [id])
   createdAt   DateTime            @default(now())
@@ -220,6 +222,8 @@ model SalesOrder {
   deliveredAt DateTime?
   invoicedAt  DateTime?
   notes       String?
+  // Plaque d'immatriculation du véhicule concerné (saisie libre, optionnelle).
+  licensePlate String?
   createdById String?
   createdBy   User?            @relation(fields: [createdById], references: [id])
   createdAt   DateTime         @default(now())

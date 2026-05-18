@@ -142,6 +142,14 @@ export default async function PurchaseOrderDetailPage({
           </div>
           <div>{formatDate(order.receivedAt)}</div>
         </div>
+        {order.licensePlate && (
+          <div className="sm:col-span-3">
+            <div className="text-xs uppercase text-muted-foreground">
+              Plaque d&apos;immatriculation
+            </div>
+            <div className="font-mono">{order.licensePlate}</div>
+          </div>
+        )}
         {order.notes && (
           <div className="sm:col-span-3">
             <div className="text-xs uppercase text-muted-foreground">Notes</div>

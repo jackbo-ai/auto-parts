@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/permissions";
 import { Role } from "@prisma/client";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { createSalesOrder } from "../actions";
@@ -50,6 +51,14 @@ export default async function NewSalesOrderPage({
             id="notes"
             name="notes"
             placeholder="Conditions, contact…"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="licensePlate">Plaque d&apos;immatriculation</Label>
+          <Input
+            id="licensePlate"
+            name="licensePlate"
+            placeholder="AB-123-CD"
           />
         </div>
         <p className="text-xs text-muted-foreground">

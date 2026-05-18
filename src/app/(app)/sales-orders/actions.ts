@@ -40,6 +40,7 @@ const createSchema = z.object({
   customerEmail: optionalText,
   customerPhone: optionalText,
   notes: optionalText,
+  licensePlate: optionalText,
 });
 
 export async function createSalesOrder(formData: FormData) {
@@ -51,7 +52,8 @@ export async function createSalesOrder(formData: FormData) {
       parsed.error.issues[0]?.message ?? "Formulaire invalide",
     );
   }
-  const { customerName, customerEmail, customerPhone, notes } = parsed.data;
+  const { customerName, customerEmail, customerPhone, notes, licensePlate } =
+    parsed.data;
 
   const order = await prisma.$transaction(async (tx) => {
     // Résolution du client : match exact (insensible à la casse) sur le nom,
@@ -81,6 +83,7 @@ export async function createSalesOrder(formData: FormData) {
         reference: buildReference("VTE", count),
         customerId,
         notes,
+        licensePlate,
         createdById: user.id,
       },
     });

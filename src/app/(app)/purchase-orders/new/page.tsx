@@ -70,6 +70,14 @@ export default async function NewPurchaseOrderPage({
             <Label htmlFor="notes">Notes</Label>
             <Textarea id="notes" name="notes" placeholder="Conditions, contact…" />
           </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="licensePlate">Plaque d&apos;immatriculation</Label>
+            <Input
+              id="licensePlate"
+              name="licensePlate"
+              placeholder="AB-123-CD"
+            />
+          </div>
           <p className="text-xs text-muted-foreground">
             La commande est créée en brouillon. Vous ajouterez les lignes
             (pièces) à l&apos;étape suivante.

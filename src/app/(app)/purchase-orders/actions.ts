@@ -39,6 +39,7 @@ const createSchema = z.object({
   supplierId: z.string().min(1, "Le fournisseur est obligatoire"),
   expectedAt: optionalDate,
   notes: optionalText,
+  licensePlate: optionalText,
 });
 
 export async function createPurchaseOrder(formData: FormData) {
@@ -59,6 +60,7 @@ export async function createPurchaseOrder(formData: FormData) {
         supplierId: parsed.data.supplierId,
         expectedAt: parsed.data.expectedAt,
         notes: parsed.data.notes,
+        licensePlate: parsed.data.licensePlate,
         createdById: user.id,
       },
     });
