@@ -55,11 +55,24 @@ function InfoRow({
 
 export default async function PartDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ movFrom?: string; movTo?: string }>;
 }) {
   const me = await requireUser();
   const { id } = await params;
+  const sp = await searchParams;
+
+  // Filtres d'historique sur la fiche pièce : plage de dates. Sans filtre, on
+  // garde les 20 derniers mouvements en aperçu rapide ; avec filtre, on
+  // charge l'intégralité de la période (plafonné à 500 pour la sécurité).
+  const movFromStr = sp.movFrom?.trim() || "";
+  const movToStr = sp.movTo?.trim() || "";
+  const hasMovFilter = Boolean(movFromStr || movToStr);
+  const movCreatedAt: { gte?: Date; lte?: Date } = {};
+  if (movFromStr) movCreatedAt.gte = new Date(`${movFromStr}T00:00:00`);
+  if (movToStr) movCreatedAt.lte = new Date(`${movToStr}T23:59:59.999`);
 
   const part = await prisma.part.findUnique({
     where: { id },
@@ -69,8 +82,9 @@ export default async function PartDetailPage({
       supplier: { select: { id: true, name: true } },
       fitments: { orderBy: [{ make: "asc" }, { model: "asc" }] },
       movements: {
+        where: hasMovFilter ? { createdAt: movCreatedAt } : undefined,
         orderBy: { createdAt: "desc" },
-        take: 20,
+        take: hasMovFilter ? 500 : 20,
         include: { createdBy: { select: { name: true } } },
       },
     },
@@ -473,53 +487,116 @@ export default async function PartDetailPage({
 
           {/* Historique des mouvements */}
           <div className="rounded-lg border bg-card p-4">
-            <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-              Mouvements de stock
-            </h2>
-            <div className="space-y-1.5">
-              {part.movements.length === 0 && (
-                <p className="text-sm text-muted-foreground">
-                  Aucun mouvement enregistré.
-                </p>
-              )}
-              {part.movements.map((mv) => {
-                const isIn = mv.quantity >= 0;
-                return (
-                  <div
-                    key={mv.id}
-                    className="flex items-center justify-between gap-2 rounded-md border bg-background px-3 py-2 text-sm"
+            <div className="mb-2 flex flex-wrap items-end justify-between gap-2">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                Mouvements de stock
+                {hasMovFilter
+                  ? ` — ${part.movements.length}${part.movements.length === 500 ? "+" : ""} sur la période`
+                  : ` — 20 derniers`}
+              </h2>
+              <form
+                action={`/parts/${part.id}`}
+                className="flex flex-wrap items-end gap-2"
+              >
+                <div className="space-y-0.5">
+                  <label
+                    htmlFor="movFrom"
+                    className="text-xs text-muted-foreground"
                   >
-                    <div>
-                      <div className="text-xs text-muted-foreground">
-                        {formatDateTime(mv.createdAt)}
-                        {mv.createdBy ? ` · ${mv.createdBy.name}` : ""}
-                      </div>
-                      {mv.reason && <div>{mv.reason}</div>}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Badge
-                        className={
-                          isIn
-                            ? "border-emerald-300 bg-emerald-100 text-emerald-800"
-                            : "border-amber-300 bg-amber-100 text-amber-800"
-                        }
-                      >
-                        {isIn ? (
-                          <ArrowUpRight className="h-3 w-3" />
-                        ) : (
-                          <ArrowDownRight className="h-3 w-3" />
-                        )}
-                        {isIn ? "+" : ""}
-                        {mv.quantity}
-                      </Badge>
-                      <span className="tabular-nums text-muted-foreground">
-                        → {mv.resulting}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
+                    Du
+                  </label>
+                  <Input
+                    id="movFrom"
+                    name="movFrom"
+                    type="date"
+                    defaultValue={movFromStr}
+                    className="h-8 w-[10rem]"
+                  />
+                </div>
+                <div className="space-y-0.5">
+                  <label
+                    htmlFor="movTo"
+                    className="text-xs text-muted-foreground"
+                  >
+                    Au
+                  </label>
+                  <Input
+                    id="movTo"
+                    name="movTo"
+                    type="date"
+                    defaultValue={movToStr}
+                    className="h-8 w-[10rem]"
+                  />
+                </div>
+                <Button type="submit" variant="secondary" size="sm">
+                  Filtrer
+                </Button>
+                {hasMovFilter && (
+                  <Button asChild variant="ghost" size="sm">
+                    <Link href={`/parts/${part.id}`}>Réinitialiser</Link>
+                  </Button>
+                )}
+              </form>
             </div>
+            {part.movements.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                {hasMovFilter
+                  ? "Aucun mouvement sur cette période."
+                  : "Aucun mouvement enregistré."}
+              </p>
+            ) : (
+              <div className="overflow-hidden rounded-md border">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/60 text-left text-xs uppercase text-muted-foreground">
+                    <tr>
+                      <th className="px-3 py-2">Date</th>
+                      <th className="px-3 py-2">Motif</th>
+                      <th className="px-3 py-2">Utilisateur</th>
+                      <th className="px-3 py-2 text-right">Quantité</th>
+                      <th className="px-3 py-2 text-right">Stock après</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {part.movements.map((mv) => {
+                      const isIn = mv.quantity >= 0;
+                      return (
+                        <tr key={mv.id} className="border-t">
+                          <td className="px-3 py-2 text-xs text-muted-foreground">
+                            {formatDateTime(mv.createdAt)}
+                          </td>
+                          <td className="px-3 py-2 text-muted-foreground">
+                            {mv.reason ?? "—"}
+                          </td>
+                          <td className="px-3 py-2 text-muted-foreground">
+                            {mv.createdBy?.name ?? "—"}
+                          </td>
+                          <td className="px-3 py-2 text-right">
+                            <Badge
+                              className={
+                                isIn
+                                  ? "border-emerald-300 bg-emerald-100 text-emerald-800"
+                                  : "border-amber-300 bg-amber-100 text-amber-800"
+                              }
+                            >
+                              {isIn ? (
+                                <ArrowUpRight className="h-3 w-3" />
+                              ) : (
+                                <ArrowDownRight className="h-3 w-3" />
+                              )}
+                              {isIn ? "+" : ""}
+                              {mv.quantity}
+                            </Badge>
+                          </td>
+                          <td className="px-3 py-2 text-right tabular-nums">
+                            {mv.resulting}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </section>
 

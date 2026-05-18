@@ -6,10 +6,13 @@ import {
   ArrowUpRight,
   Boxes,
   CalendarClock,
+  History,
   PackageCheck,
   PackageX,
   SlidersHorizontal,
 } from "lucide-react";
+import type { Prisma } from "@prisma/client";
+import { StockMovementType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/permissions";
 import { Badge } from "@/components/ui/badge";
@@ -30,12 +33,19 @@ import { recordStockMovement } from "./actions";
 export default async function StockPage({
   searchParams,
 }: {
-  searchParams: Promise<{ ref?: string; date?: string }>;
+  searchParams: Promise<{
+    ref?: string;
+    date?: string;
+    movRef?: string;
+    movFrom?: string;
+    movTo?: string;
+    movType?: string;
+  }>;
 }) {
   await requireUser();
   const params = await searchParams;
 
-  const [parts, recentMovements, pmpAchatMap, inactiveCount, stockReasons] =
+  const [parts, pmpAchatMap, inactiveCount, stockReasons] =
     await Promise.all([
       prisma.part.findMany({
         where: { active: true },
@@ -49,14 +59,6 @@ export default async function StockPage({
         },
         orderBy: { reference: "asc" },
       }),
-      prisma.stockMovement.findMany({
-        orderBy: { createdAt: "desc" },
-        take: 30,
-        include: {
-          part: { select: { id: true, reference: true, name: true } },
-          createdBy: { select: { name: true } },
-        },
-      }),
       partsPmpMap(),
       prisma.part.count({ where: { active: false } }),
       prisma.stockMovementReason.findMany({
@@ -64,6 +66,44 @@ export default async function StockPage({
         select: { id: true, label: true },
       }),
     ]);
+
+  // Historique des mouvements : filtres optionnels (référence, plage de dates,
+  // type). Sans filtre, on retombe sur les 30 derniers mouvements pour garder
+  // un aperçu rapide. Avec filtre, on affiche tous les mouvements correspondants
+  // (plafonné à 500 pour éviter une explosion de la page).
+  const movRef = params.movRef?.trim() || "";
+  const movFromStr = params.movFrom?.trim() || "";
+  const movToStr = params.movTo?.trim() || "";
+  const movTypeStr = params.movType?.trim() || "";
+  const movFilterPart = movRef
+    ? parts.find(
+        (p) => p.reference.toLowerCase() === movRef.toLowerCase(),
+      ) ?? null
+    : null;
+  const movType =
+    movTypeStr === "IN" || movTypeStr === "OUT" || movTypeStr === "ADJUSTMENT"
+      ? (movTypeStr as StockMovementType)
+      : null;
+  const movWhere: Prisma.StockMovementWhereInput = {};
+  if (movFilterPart) movWhere.partId = movFilterPart.id;
+  if (movType) movWhere.type = movType;
+  if (movFromStr || movToStr) {
+    movWhere.createdAt = {};
+    if (movFromStr) movWhere.createdAt.gte = new Date(`${movFromStr}T00:00:00`);
+    if (movToStr) movWhere.createdAt.lte = new Date(`${movToStr}T23:59:59.999`);
+  }
+  const hasMovFilter = Boolean(
+    (movRef && movFilterPart) || movFromStr || movToStr || movType,
+  );
+  const movements = await prisma.stockMovement.findMany({
+    where: movWhere,
+    orderBy: { createdAt: "desc" },
+    take: hasMovFilter ? 500 : 30,
+    include: {
+      part: { select: { id: true, reference: true, name: true } },
+      createdBy: { select: { name: true } },
+    },
+  });
 
   // « À réapprovisionner » = tout ce qui est au niveau du seuil ou en dessous,
   // ruptures comprises (cohérent avec le tableau de bord). « Ruptures de
@@ -234,6 +274,17 @@ export default async function StockPage({
             action="/stock"
             className="flex flex-wrap items-end gap-2 rounded-lg border bg-card p-4"
           >
+            {/* Préserve un éventuel filtre actif dans l'historique des mouvements. */}
+            {movRef ? <input type="hidden" name="movRef" value={movRef} /> : null}
+            {movFromStr ? (
+              <input type="hidden" name="movFrom" value={movFromStr} />
+            ) : null}
+            {movToStr ? (
+              <input type="hidden" name="movTo" value={movToStr} />
+            ) : null}
+            {movTypeStr ? (
+              <input type="hidden" name="movType" value={movTypeStr} />
+            ) : null}
             <div className="flex-1 space-y-1">
               <label htmlFor="ref" className="text-xs text-muted-foreground">
                 Référence article
@@ -304,9 +355,90 @@ export default async function StockPage({
       </section>
 
       <section className="space-y-2">
-        <h2 className="text-base font-medium">
-          Mouvements récents ({recentMovements.length})
+        <h2 className="flex items-center gap-2 text-base font-medium">
+          <History className="h-4 w-4" />
+          {hasMovFilter
+            ? `Historique filtré (${movements.length}${movements.length === 500 ? "+" : ""})`
+            : `Mouvements récents (${movements.length})`}
         </h2>
+        <form
+          action="/stock"
+          className="flex flex-wrap items-end gap-2 rounded-lg border bg-card p-4"
+        >
+          {/* Conserve le contexte "Stock à une date" si une recherche y est déjà saisie. */}
+          {filterRef ? (
+            <input type="hidden" name="ref" value={filterRef} />
+          ) : null}
+          {params.date ? (
+            <input type="hidden" name="date" value={filterDate} />
+          ) : null}
+          <div className="space-y-1">
+            <label htmlFor="movRef" className="text-xs text-muted-foreground">
+              Référence article
+            </label>
+            <Input
+              id="movRef"
+              name="movRef"
+              list="mov-part-refs"
+              defaultValue={movRef}
+              placeholder="Toutes"
+              autoComplete="off"
+            />
+            <datalist id="mov-part-refs">
+              {parts.map((p) => (
+                <option key={p.id} value={p.reference}>
+                  {p.name}
+                </option>
+              ))}
+            </datalist>
+          </div>
+          <div className="space-y-1">
+            <label htmlFor="movFrom" className="text-xs text-muted-foreground">
+              Du
+            </label>
+            <Input
+              id="movFrom"
+              name="movFrom"
+              type="date"
+              defaultValue={movFromStr}
+            />
+          </div>
+          <div className="space-y-1">
+            <label htmlFor="movTo" className="text-xs text-muted-foreground">
+              Au
+            </label>
+            <Input
+              id="movTo"
+              name="movTo"
+              type="date"
+              defaultValue={movToStr}
+            />
+          </div>
+          <div className="space-y-1">
+            <label htmlFor="movType" className="text-xs text-muted-foreground">
+              Type
+            </label>
+            <Select id="movType" name="movType" defaultValue={movTypeStr}>
+              <option value="">Tous</option>
+              <option value="IN">Entrée (+)</option>
+              <option value="OUT">Sortie (−)</option>
+              <option value="ADJUSTMENT">Inventaire</option>
+            </Select>
+          </div>
+          <Button type="submit" variant="secondary">
+            Filtrer
+          </Button>
+          {hasMovFilter && (
+            <Button asChild variant="ghost">
+              <Link href="/stock">Réinitialiser</Link>
+            </Button>
+          )}
+          {movRef && !movFilterPart && (
+            <p className="basis-full text-xs text-destructive">
+              Référence introuvable — filtre ignoré.
+            </p>
+          )}
+        </form>
         <div className="overflow-hidden rounded-lg border bg-card">
           <table className="w-full text-sm">
             <thead className="border-b bg-muted/60 text-left text-xs uppercase text-muted-foreground">
@@ -314,30 +446,30 @@ export default async function StockPage({
                 <th className="px-4 py-3">Date</th>
                 <th className="px-4 py-3">Pièce</th>
                 <th className="px-4 py-3">Motif</th>
+                <th className="px-4 py-3">Utilisateur</th>
                 <th className="px-4 py-3">Quantité</th>
                 <th className="px-4 py-3">Stock après</th>
               </tr>
             </thead>
             <tbody>
-              {recentMovements.length === 0 && (
+              {movements.length === 0 && (
                 <tr>
                   <td
-                    colSpan={5}
+                    colSpan={6}
                     className="px-4 py-12 text-center text-muted-foreground"
                   >
-                    Aucun mouvement enregistré.
+                    {hasMovFilter
+                      ? "Aucun mouvement ne correspond à ces critères."
+                      : "Aucun mouvement enregistré."}
                   </td>
                 </tr>
               )}
-              {recentMovements.map((m) => {
+              {movements.map((m) => {
                 const isIn = m.quantity >= 0;
                 return (
                   <tr key={m.id} className="border-b last:border-0">
                     <td className="px-4 py-3 text-xs text-muted-foreground">
                       {formatDateTime(m.createdAt)}
-                      {m.createdBy ? (
-                        <div>{m.createdBy.name}</div>
-                      ) : null}
                     </td>
                     <td className="px-4 py-3">
                       <Link
@@ -354,6 +486,9 @@ export default async function StockPage({
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">
                       {m.reason ?? "—"}
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground">
+                      {m.createdBy?.name ?? "—"}
                     </td>
                     <td className="px-4 py-3">
                       <Badge
